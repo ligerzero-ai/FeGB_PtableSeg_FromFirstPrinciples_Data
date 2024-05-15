@@ -1,0 +1,7 @@
+name: FeGB_PtableSeg
+dependencies:
+  - python>=3.9
+  - pymatgen=2023.10.11
+  - pip:
+    - -e .
+
