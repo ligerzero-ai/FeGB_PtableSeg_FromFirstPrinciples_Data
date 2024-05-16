@@ -1,8 +1,15 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import matplotlib.cm as cm
+from matplotlib.colors import Normalize
+import matplotlib.patches as patches
 
 import numpy as np
 import pandas as pd
+
+import os
+
+from pymatgen.core import Structure
 
 custom_colors = {"S11_RA110_S3_32": 'red',
                  "S3_RA110_S1_11": 'blue',
@@ -20,8 +27,8 @@ gb_latex_dict = {
     "S3_RA110_S1_11": r'$\Sigma3$[110]$(1\overline{1}1)$',
     "S9_RA110_S2_21": r'$\Sigma9$[110]$(2\overline{2}1)$'
 }
-
-bulk_df = pd.read_csv("bulk_df.csv")
+module_path = os.path.dirname(os.path.abspath(__file__))
+bulk_df = pd.read_csv(os.path.join(module_path, 'bulk_df.csv'))
 
 def plot_minEseg_prop(df,
                       y_prop="E_seg",
@@ -85,7 +92,6 @@ def plot_minEseg_prop(df,
     plt.gca().add_artist(gb_legend)
 
     return fig, ax1
-
 
 def plot_pivot_table(df,
                  colormap_thresholds=[None, None],
@@ -155,3 +161,335 @@ def plot_pivot_table(df,
     axs.grid(which='minor', color='black', linestyle='-', linewidth=1)
     
     return fig, axs
+
+def periodic_table_plot(plot_df, 
+                        property="Eseg_min",
+                        count_min=None,
+                        count_max=None,
+                        center_cm_zero=False,
+                        center_point=None,  # New parameter for arbitrary centering
+                        property_name=None,
+                        cmap=cm.Blues,
+                        element_font_color = "darkgoldenrod"
+):
+    module_path = os.path.dirname(os.path.abspath(__file__))
+    bulk_df = pd.read_csv(os.path.join(module_path, 'bulk_df.csv'))
+    bulk_df.index = bulk_df['element'].values
+    #elem_tracker = bulk_df['count']
+    bulk_df = bulk_df[bulk_df['Z'] <= 92]  # Cap at element 92
+
+    n_row = bulk_df['row'].max()
+    n_column = bulk_df['column'].max()
+
+    fig, ax = plt.subplots(figsize=(n_column, n_row))
+    rows = bulk_df['row']
+    columns = bulk_df['column']
+    symbols = bulk_df['element']
+    rw = 0.9  # rectangle width
+    rh = rw    # rectangle height
+
+    if count_min is None:
+        count_min = plot_df[property].min()
+    if count_max is None:
+        count_max = plot_df[property].max()
+
+    # Adjust normalization based on centering preference
+    if center_cm_zero:
+        cm_threshold = max(abs(count_min), abs(count_max))
+        norm = Normalize(-cm_threshold, cm_threshold)
+    elif center_point is not None:
+        # Adjust normalization to center around the arbitrary point
+        max_diff = max(center_point - count_min, count_max - center_point)
+        norm = Normalize(center_point - max_diff, center_point + max_diff)
+    else:
+        norm = Normalize(vmin=count_min, vmax=count_max)
+
+    for row, column, symbol in zip(rows, columns, symbols):
+        row = bulk_df['row'].max() - row
+        if symbol in plot_df.element.unique():
+            count = plot_df[plot_df["element"] == symbol][property].values[0]
+            # Check for NaN and adjust color and skip text accordingly
+            if pd.isna(count):
+                color = 'grey'  # Set color to none for NaN values
+                count = ''  # Avoid displaying text for NaN values
+            else:
+                color = cmap(norm(count))
+        else:
+            count = ''
+            color = 'none'
+
+        if row < 3:
+            row += 0.5
+        rect = patches.Rectangle((column, row), rw, rh,
+                                linewidth=1.5,
+                                edgecolor='gray',
+                                facecolor=color,
+                                alpha=1)
+
+        # Element symbol
+        plt.text(column + rw / 2, row + rh / 2 + 0.2, symbol,
+                horizontalalignment='center',
+                verticalalignment='center',
+                fontsize=22,  # Adjusted for visibility
+                fontweight='semibold',
+                color=element_font_color)
+
+        # Property value - Added below the symbol
+        if count:  # Only display if count is not empty (including not NaN)
+            plt.text(column + rw / 2, row + rh / 2 - 0.25, f"{count:.2f}",  # Formatting count to 2 decimal places
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    fontsize=14,  # Smaller font size for the count value
+                    fontweight='semibold',
+                    color=element_font_color)
+
+        ax.add_patch(rect)
+    # Generate the color bar
+    granularity = 20
+    colormap_array = np.linspace(norm.vmin, norm.vmax, granularity) if center_point is None else np.linspace(center_point - max_diff, center_point + max_diff, granularity)
+    
+    for i, value in enumerate(colormap_array):
+        color = cmap(norm(value))
+        color = 'silver' if value == 0 else color
+        length = 9
+        x_offset = 3.5
+        y_offset = 7.8
+        x_loc = i / granularity * length + x_offset
+        width = length / granularity
+        height = 0.35
+        rect = patches.Rectangle((x_loc, y_offset), width, height,
+                                 linewidth=1.5,
+                                 edgecolor='gray',
+                                 facecolor=color,
+                                 alpha=1)
+
+        if i in [0, granularity//4, granularity//2, 3*granularity//4, granularity-1]:
+            plt.text(x_loc + width / 2, y_offset - 0.4, f'{value:.1f}',
+                     horizontalalignment='center',
+                     verticalalignment='center',
+                     fontweight='semibold',
+                     fontsize=20, color='k')
+
+        ax.add_patch(rect)
+
+    if property_name is None:
+        property_name = property
+    plt.text(x_offset + length / 2, y_offset + 1.0,
+             property_name,
+             horizontalalignment='center',
+             verticalalignment='center',
+             fontweight='semibold',
+             fontsize=20, color='k')
+    ax.set_ylim(-0.15, n_row + .1)
+    ax.set_xlim(0.85, n_column + 1.1)
+
+    ax.axis('off')
+    plt.draw()
+    plt.pause(0.001)
+    plt.close()
+    return fig, ax
+
+def get_GB_area(df_seg, GB):
+    df_GB = df_seg[df_seg["GB"] == GB]
+    struct = Structure.from_str(df_GB.structure.iloc[0], fmt="json")
+    area  = struct.volume/struct.lattice.c*0.01 # Area in nm^2
+    return area
+
+def plot_coverage_vs_temperature(df,
+                                 df_spectra,
+                                 alloy_conc,
+                                 temperature_range,
+                                 element,
+                                 close_fig=True,
+                                 save_path="/mnt/c/Users/liger/Koofr/Fe-PtableTrends-Manuscript/Figures",
+                                 xlims=None,
+                                 ylims=None,
+                                 figsize=(12, 9)):
+    fig, ax1 = plt.subplots(figsize=figsize)
+    legend_elements = []  # List to hold the legend handles
+    df_ele = df_spectra[df_spectra["element"] == element]
+    plot_data = []
+
+    # Add a special legend entry for headers
+    header_label = "      GB            min(E$_{\mathrm{seg}}$)"
+    legend_elements.append(plt.Line2D([0], [0], color='none', label=header_label))
+
+    for GB, GB_df in df_ele.groupby(by="GB"):
+        temp_concs = []
+        for temp in temperature_range:
+            site_concentrations = calc_C_GB(temp, alloy_conc * 0.01, np.array(GB_df.total_spectra.values[0]))
+            temp_concs.append(site_concentrations.sum() / get_GB_area(df, GB=GB))
+        plot_data.append((temperature_range, temp_concs, GB))
+        
+        min_total_spectra = min(GB_df.total_spectra.values[0])
+        # Format the label to just include the GB, no min(E_seg)
+        min_total_spectra = min(GB_df.total_spectra.values[0])
+        label = f"{gb_latex_dict[GB]} {min_total_spectra:.2f} eV"
+        legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', label=label,
+                                          markerfacecolor=custom_colors[GB], markersize=15, linestyle='None'))
+    legend_elements.append(legend_elements.pop(1))  # Adjust order to keep header at the top
+
+    # Plot data
+    for data in plot_data:
+        color = custom_colors[data[2]]
+        ax1.plot(data[0], data[1], linewidth=8, color=color)
+
+    # Axis settings and text
+    ax1.set_xlabel("Temperature (K)", fontsize=24)
+    ax1.set_ylabel("Atomic coverage (atoms/nm$^2$)", fontsize=24)
+    ax1.tick_params(labelsize=24)
+    ax1.grid()
+
+    # Set xlims and ylims if specified
+    if xlims is not None:
+        ax1.set_xlim([max(0, xlims[0]), xlims[1] if xlims[1] is not None else ax1.get_xlim()[1]])
+    else:
+        ax1.set_xlim(left=0)
+
+    if ylims is not None:
+        ax1.set_ylim([max(0, ylims[0]), ylims[1] if ylims[1] is not None else ax1.get_ylim()[1]])
+    else:
+        ax1.set_ylim(bottom=0)
+
+    # Place text for element and bulk concentration
+    ax1.text(0.05, 0.05, f'{element}\n{alloy_conc:.2f} at.%', transform=ax1.transAxes, fontsize=40, verticalalignment='bottom', horizontalalignment='left')
+
+    # Legend setup
+    ax1.legend(handles=legend_elements, loc='upper right', bbox_to_anchor = (0.99, 0.99), fontsize=22, frameon=True, handletextpad=0.01, borderpad=0.05, labelspacing=0.3)
+
+    # Additional x-axis for Celsius
+    kelvin_ticks = [73, 273, 473, 673, 873, 1073, 1273]
+    celsius_ticks = [k - 273 for k in kelvin_ticks]
+    ax2 = ax1.twiny()
+    ax2.set_xlim(ax1.get_xlim())
+    ax2.set_xticks(kelvin_ticks)
+    ax2.set_xticklabels([f"{c}°C" for c in celsius_ticks])
+    ax2.set_xlabel("Temperature (°C)", fontsize=24)
+    ax2.tick_params(axis='x', labelsize=24)
+
+    # Save and close figure
+    # fig.savefig(f'{save_path}/WhiteCoghlan/WhiteCoghlan_{element}_{alloy_conc}.png', dpi=300, bbox_inches='tight', pad_inches=0.1)
+    
+    if close_fig:
+        plt.close(fig)  # Close the figure to avoid display
+        
+    return fig, ax1
+
+def calc_C_GB(Temperature,c_bulk,E_seg):
+    """
+    Calculate the grain boundary concentration.
+
+    :param Temperature: Temperature in Kelvin
+    :param c_bulk: Bulk concentration
+    :param E_seg: Segregation energy array for a given element at different sites
+    :return: Grain boundary concentration
+    """
+    c_GB = np.divide(c_bulk * np.exp(-E_seg/(8.6173303e-05*Temperature))\
+        ,(1 - c_bulk + c_bulk * np.exp(-E_seg/(8.6173303e-05*Temperature))))
+    return c_GB
+
+class GB_symmetries():
+    def __init__(self):
+        # S3 S111
+        studied_list = [20, 22, 24, 26, 28, 30, 32, 34, 36]
+        # 0.5-1ML available
+        symmetry = [[21, 52, 53],\
+                    [23, 50, 51],\
+                    [25, 48, 49],\
+                    [27, 46, 47],\
+                    [29, 44, 45],\
+                    [31, 42, 43],\
+                    [33, 40, 41],\
+                    [35, 38, 39],\
+                    [37]]
+        # When the site is on the GB plane, we don't need to calculate values on both sides
+        self.S3_1_symmetrydict = dict(zip(studied_list,symmetry))
+        
+        # S3 S112
+        studied_list = [12, 14, 16, 18, 20, 22, 24]
+        # 0.5-1ML available
+        symmetry = [[13, 36, 37],\
+                    [15, 34, 35],\
+                    [17, 32, 33],\
+                    [19, 30, 31],\
+                    [21, 28, 29],\
+                    [23, 26, 27],\
+                    [25]]
+        # When the site is on the GB plane, we don't need to calculate values on both sides
+        self.S3_2_symmetrydict = dict(zip(studied_list,symmetry))
+        
+        # S9
+        studied_list = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+        # only 0-1 ML available
+        symmetry = [[47],\
+                [46],\
+                [45],\
+                [44],\
+                [43],\
+                [42],\
+                [41],\
+                [40],\
+                [39],\
+                [38],\
+                [37],\
+                [],\
+                [],\
+                []]
+        # When the site is on the GB plane, we don't need to calculate values on both sides
+        self.S9_symmetrydict = dict(zip(studied_list,symmetry))
+        
+        # S11
+        studied_list = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+        # only 0-1 ML available
+        symmetry = [[32],\
+                    [31],\
+                    [30],\
+                    [29],\
+                    [28],\
+                    [27],\
+                    [26],\
+                    [25],\
+                    [24],\
+                    [23],\
+                    [],\
+                    []]
+        self.S11_symmetrydict = dict(zip(studied_list,symmetry))
+        
+        #S5 210
+        studied_list = [24, 27, 29, 31, 33, 35, 37]
+        # ML not well defined, should be 0,0.5,1 ML but middle plane has two inequivalent sites
+        symmetry = [[25] + [46, 47],\
+                    [26] + [44, 45],\
+                    [28] + [42, 43],\
+                    [30] + [40, 41],\
+                    [32] + [38, 39],\
+                    [34],\
+                    [36]]
+        self.S5_2_symmetrydict = dict(zip(studied_list,symmetry))
+
+        # S5 310
+        # 0/0.25/0.5/0.75/1 ML
+        studied_list = [23, 27, 33, 37, 40]
+        symmetry = [[22, 24, 25] + [54, 55, 56, 57],\
+                    [26, 28, 29] + [50, 51 ,52, 53],\
+                    [30, 31, 32] + [46, 47, 48, 49],\
+                    [34, 35, 36] + [42, 43, 44, 45],\
+                    [38, 39, 41]]
+        self.S5_3_symmetrydict = dict(zip(studied_list,symmetry))
+        
+        name_list = ['S9_RA110_S2_21',
+        'S11_RA110_S3_32',
+        'S3_RA110_S1_12',
+        'S3_RA110_S1_11',
+        'S5_RA001_S310',
+        'S5_RA001_S210']
+        
+        self.symmetry_dict_all = dict(zip(name_list,
+                                          [self.S9_symmetrydict,
+                                           self.S11_symmetrydict,
+                                           self.S3_2_symmetrydict,
+                                           self.S3_1_symmetrydict,
+                                           self.S5_3_symmetrydict,
+                                           self.S5_2_symmetrydict])
+                                     )
+GB_sym = GB_symmetries()
