@@ -27,6 +27,16 @@ gb_latex_dict = {
     "S3_RA110_S1_11": r'$\Sigma3$[110]$(1\overline{1}1)$',
     "S9_RA110_S2_21": r'$\Sigma9$[110]$(2\overline{2}1)$'
 }
+
+gb_marker_dict = {
+    "S3_RA110_S1_11": '*',
+    "S3_RA110_S1_12": 'P',
+    "S5_RA001_S210": '^',
+    "S5_RA001_S310": 'o',
+    "S9_RA110_S2_21": 'X',
+    "S11_RA110_S3_32": 's',
+}
+
 module_path = os.path.dirname(os.path.abspath(__file__))
 bulk_df = pd.read_csv(os.path.join(module_path, 'bulk_df.csv'))
 
@@ -387,7 +397,6 @@ def calc_C_GB(Temperature,c_bulk,E_seg):
     c_GB = np.divide(c_bulk * np.exp(-E_seg/(8.6173303e-05*Temperature))\
         ,(1 - c_bulk + c_bulk * np.exp(-E_seg/(8.6173303e-05*Temperature))))
     return c_GB
-
 class GB_symmetries():
     def __init__(self):
         # S3 S111
@@ -492,4 +501,168 @@ class GB_symmetries():
                                            self.S5_3_symmetrydict,
                                            self.S5_2_symmetrydict])
                                      )
-GB_sym = GB_symmetries()
+
+def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
+                           xlabel=r"$\rm{R}_{\rm{W_{\rm{sep}}}}$", ylabel=r"$\rm{R}_{\rm{ANSBO}}$",
+                           xlabel_fontsize=24, ylabel_fontsize=24, legend_fontsize=12,
+                           bin_width_x=0.02, bin_width_y=0.02, close_fig=True, mask_limits=None,
+                           hist_ticksize=20, scatter_ticksize=20, title=None, title_fontsize=24):
+    fig = plt.figure(figsize=(10, 10))
+    ax_scatter = plt.axes([0.1, 0.1, 0.65, 0.65])
+    ax_histx = plt.axes([0.1, 0.77, 0.65, 0.2], sharex=ax_scatter)
+    ax_histy = plt.axes([0.77, 0.1, 0.2, 0.65], sharey=ax_scatter)
+
+    ax_histx.tick_params(axis="x", which="both", bottom=False, top=False, labelbottom=False)
+    ax_histy.tick_params(axis="y", which="both", left=False, right=False, labelleft=False)
+
+    all_x = []
+    all_y = []
+    
+    df[f"full_multiplicity_{x}"] = [[row[x]] * row.site_multiplicity for _, row in df.iterrows()]
+    df[f"full_multiplicity_{y}"] = [[row[y]] * row.site_multiplicity for _, row in df.iterrows()]
+
+    # Collect all data first to define global bin edges
+    for gb_type, marker in gb_marker_dict.items():
+        gb_df = df[df['GB'] == gb_type].dropna()
+
+        plot_x = np.concatenate(gb_df[f"full_multiplicity_{x}"].explode().dropna().apply(np.ravel).tolist())
+        plot_y = np.concatenate(gb_df[f"full_multiplicity_{y}"].explode().dropna().apply(np.ravel).tolist())
+
+        if mask_limits:
+            mask = (plot_x >= mask_limits[0]) & (plot_x <= mask_limits[1]) & (plot_y >= mask_limits[0]) & (plot_y <= mask_limits[1])
+            plot_x = plot_x[mask]
+            plot_y = plot_y[mask]
+
+        all_x.extend(plot_x)
+        all_y.extend(plot_y)
+
+    # Calculate bins for x and y histograms with alignment logic
+    min_x = np.floor(min(all_x) / bin_width_x) * bin_width_x
+    max_x = np.ceil(max(all_x) / bin_width_x) * bin_width_x
+    binsx = np.arange(min_x, max_x + bin_width_x, bin_width_x)
+    
+    min_y = np.floor(min(all_y) / bin_width_y) * bin_width_y
+    max_y = np.ceil(max(all_y) / bin_width_y) * bin_width_y
+    binsy = np.arange(min_y, max_y + bin_width_y, bin_width_y)
+
+    # Initialize bottom arrays for stacked bars
+    bottom_x = np.zeros(len(binsx) - 1)
+    bottom_y = np.zeros(len(binsy) - 1)
+
+    # Re-loop to plot
+    for gb_type, marker in gb_marker_dict.items():
+        plot_x = np.concatenate(df[df['GB'] == gb_type][f"full_multiplicity_{x}"].explode().dropna().apply(np.ravel).tolist())
+        plot_y = np.concatenate(df[df['GB'] == gb_type][f"full_multiplicity_{y}"].explode().dropna().apply(np.ravel).tolist())
+        
+        if mask_limits:
+            mask = (plot_x >= mask_limits[0]) & (plot_x <= mask_limits[1]) & (plot_y >= mask_limits[0]) & (plot_y <= mask_limits[1])
+            plot_x = plot_x[mask]
+            plot_y = plot_y[mask]
+
+        counts_x, _ = np.histogram(plot_x, bins=binsx)
+        counts_y, _ = np.histogram(plot_y, bins=binsy)
+        print(plot_x)
+        print(plot_y)
+        ax_scatter.scatter(plot_x, plot_y, alpha=0.9, marker=marker, s=200, label=gb_latex_dict[gb_type], c=custom_colors[gb_type])
+
+        ax_histx.bar(binsx[:-1], counts_x, width=np.diff(binsx), bottom=bottom_x, align='edge', label=gb_type, color=custom_colors[gb_type])
+        bottom_x += counts_x
+        ax_histy.barh(binsy[:-1], counts_y, height=np.diff(binsy), left=bottom_y, align='edge', label=gb_type, color=custom_colors[gb_type])
+        bottom_y += counts_y
+
+    # Extend axes limits by adding/subtracting one bin width
+    ax_scatter.set_xlim(min_x , max_x)
+    ax_scatter.set_ylim(min_y , max_y)
+    
+    ax_scatter.tick_params(axis='both', which='major', labelsize=scatter_ticksize)
+    ax_histx.tick_params(axis='both', which='major', labelsize=hist_ticksize)
+    ax_histy.tick_params(axis='both', which='major', labelsize=hist_ticksize)
+
+    ax_scatter.set_xlabel(xlabel, fontsize=xlabel_fontsize)
+    ax_scatter.set_ylabel(ylabel, fontsize=ylabel_fontsize)
+    ax_scatter.legend(bbox_to_anchor=(1.02, 1.02), loc="lower left", fontsize=legend_fontsize)
+    ax_scatter.grid(which="both", alpha=0.5)
+    # Add user-specified title on the top left corner
+    if title:
+        ax_scatter.text(0.01, 0.99, title, transform=ax_scatter.transAxes, fontsize=title_fontsize, verticalalignment='top', horizontalalignment='left')
+
+    if close_fig:
+        plt.close(fig)
+
+    return fig, ax_scatter
+
+## Figure 10
+def plot_property(df,
+                  x_prop,
+                  y_prop,
+                  figsize=(20,16),
+                  x_label = r"E$_{\rm{seg}}$ (eV)",
+                  y_label = r"W$_{\rm{sep}}^{\rm{RGS}}$ (J/m$^2$)",
+                  element_groups = None,
+                  text_labels = None,
+                  legend_posn = (0.001,0.681),
+                  xlims=None,  # New parameter for x-axis limits
+                  ylims=None,  # New parameter for y-axis limits
+                  savefig_path = None):
+    
+    fig = plt.figure(figsize=figsize)
+    ax1 = plt.gca()
+    gb_legends = []
+
+    df_plt = df.dropna(subset=[y_prop])
+    if element_groups is not None:
+        df_plt = df_plt[df_plt["ele_group"].isin(element_groups)]
+
+    # df_plt = df_plt[df_plt["eta_Wsep_RGS"] > 0]
+    # Looping over each unique "GB" group
+    for idx, (gb, group) in enumerate(df_plt.dropna(subset=[y_prop]).groupby("GB")):
+        # Assigning custom color for each group
+        color = custom_colors[gb]
+
+        # Plotting
+        x_values = group[x_prop]  # "Z" values for x-axis
+        y_values = group[y_prop]  # Corresponding "min_wsep_rigid" values
+        elements = group.element  # Element values for text labels
+
+        # Scatter plot for "min_wsep_rigid" on the primary y-axis
+        line1 = ax1.scatter(x_values, y_values, color=color, marker="x", s=100, linewidths=3, alpha=1.0)
+        
+        if text_labels is not None:
+            # Adding text labels for each marker
+            for x, y, element in zip(x_values, y_values, elements):
+                ax1.text(x, y, element, color=color, fontsize=20)
+
+        # Creating legends
+        gb_legends.append((line1, f'{gb_latex_dict[gb]}'))
+        # ax1.axhline(df_coh_sub[df_coh_sub["GB"] == gb].iloc[0].pure_Wsep_min, color=color, linewidth=2, linestyle="--")
+    
+    gb_legends.append(gb_legends.pop(0))
+    # Modify marker size in legend by plotting empty lists
+    for line, label in gb_legends:
+        plt.scatter([], [], s=200, color=line.get_facecolor()[0], label=label)
+
+    gb_legend = plt.legend(fontsize=30,
+                           loc="lower left",
+                           bbox_to_anchor=legend_posn,
+                           scatterpoints=1,
+                           frameon=True,
+                           handletextpad=0.1, # Reduces space between the marker and text
+                            borderpad=0.1,    # Reduces space between the text and legend border
+                            labelspacing=0.15)
+
+    ax1.tick_params(axis='y', labelsize=40, rotation=90)
+    ax1.tick_params(axis='x', which='both', labelsize=40)
+    ax1.grid(which="both")
+
+    plt.xlabel(x_label, fontsize=40)
+    plt.ylabel(y_label, fontsize=40)
+    
+    # Setting x and y limits if provided
+    if xlims is not None:
+        ax1.set_xlim(xlims)
+    if ylims is not None:
+        ax1.set_ylim(ylims)
+        
+    if savefig_path is not None:
+        plt.savefig(savefig_path, bbox_inches='tight', pad_inches=0.1)
+    return fig, ax1
