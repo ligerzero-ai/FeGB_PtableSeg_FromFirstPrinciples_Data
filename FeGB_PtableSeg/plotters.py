@@ -561,8 +561,7 @@ def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
 
         counts_x, _ = np.histogram(plot_x, bins=binsx)
         counts_y, _ = np.histogram(plot_y, bins=binsy)
-        print(plot_x)
-        print(plot_y)
+
         ax_scatter.scatter(plot_x, plot_y, alpha=0.9, marker=marker, s=200, label=gb_latex_dict[gb_type], c=custom_colors[gb_type])
 
         ax_histx.bar(binsx[:-1], counts_x, width=np.diff(binsx), bottom=bottom_x, align='edge', label=gb_type, color=custom_colors[gb_type])
