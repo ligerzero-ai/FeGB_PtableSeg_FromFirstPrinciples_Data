@@ -37,10 +37,115 @@ gb_marker_dict = {
     "S11_RA110_S3_32": 's',
 }
 
+class GB_symmetries():
+    def __init__(self):
+        # S3 S111
+        studied_list = [20, 22, 24, 26, 28, 30, 32, 34, 36]
+        # 0.5-1ML available
+        symmetry = [[21, 52, 53],\
+                    [23, 50, 51],\
+                    [25, 48, 49],\
+                    [27, 46, 47],\
+                    [29, 44, 45],\
+                    [31, 42, 43],\
+                    [33, 40, 41],\
+                    [35, 38, 39],\
+                    [37]]
+        # When the site is on the GB plane, we don't need to calculate values on both sides
+        self.S3_1_symmetrydict = dict(zip(studied_list,symmetry))
+        
+        # S3 S112
+        studied_list = [12, 14, 16, 18, 20, 22, 24]
+        # 0.5-1ML available
+        symmetry = [[13, 36, 37],\
+                    [15, 34, 35],\
+                    [17, 32, 33],\
+                    [19, 30, 31],\
+                    [21, 28, 29],\
+                    [23, 26, 27],\
+                    [25]]
+        # When the site is on the GB plane, we don't need to calculate values on both sides
+        self.S3_2_symmetrydict = dict(zip(studied_list,symmetry))
+        
+        # S9
+        studied_list = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+        # only 0-1 ML available
+        symmetry = [[47],\
+                [46],\
+                [45],\
+                [44],\
+                [43],\
+                [42],\
+                [41],\
+                [40],\
+                [39],\
+                [38],\
+                [37],\
+                [],\
+                [],\
+                []]
+        # When the site is on the GB plane, we don't need to calculate values on both sides
+        self.S9_symmetrydict = dict(zip(studied_list,symmetry))
+        
+        # S11
+        studied_list = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+        # only 0-1 ML available
+        symmetry = [[32],\
+                    [31],\
+                    [30],\
+                    [29],\
+                    [28],\
+                    [27],\
+                    [26],\
+                    [25],\
+                    [24],\
+                    [23],\
+                    [],\
+                    []]
+        self.S11_symmetrydict = dict(zip(studied_list,symmetry))
+        
+        #S5 210
+        studied_list = [24, 27, 29, 31, 33, 35, 37]
+        # ML not well defined, should be 0,0.5,1 ML but middle plane has two inequivalent sites
+        symmetry = [[25] + [46, 47],\
+                    [26] + [44, 45],\
+                    [28] + [42, 43],\
+                    [30] + [40, 41],\
+                    [32] + [38, 39],\
+                    [34],\
+                    [36]]
+        self.S5_2_symmetrydict = dict(zip(studied_list,symmetry))
+
+        # S5 310
+        # 0/0.25/0.5/0.75/1 ML
+        studied_list = [23, 27, 33, 37, 40]
+        symmetry = [[22, 24, 25] + [54, 55, 56, 57],\
+                    [26, 28, 29] + [50, 51 ,52, 53],\
+                    [30, 31, 32] + [46, 47, 48, 49],\
+                    [34, 35, 36] + [42, 43, 44, 45],\
+                    [38, 39, 41]]
+        self.S5_3_symmetrydict = dict(zip(studied_list,symmetry))
+        
+        name_list = ['S9_RA110_S2_21',
+        'S11_RA110_S3_32',
+        'S3_RA110_S1_12',
+        'S3_RA110_S1_11',
+        'S5_RA001_S310',
+        'S5_RA001_S210']
+        
+        self.symmetry_dict_all = dict(zip(name_list,
+                                          [self.S9_symmetrydict,
+                                           self.S11_symmetrydict,
+                                           self.S3_2_symmetrydict,
+                                           self.S3_1_symmetrydict,
+                                           self.S5_3_symmetrydict,
+                                           self.S5_2_symmetrydict])
+                                     )
+
 module_path = os.path.dirname(os.path.abspath(__file__))
 bulk_df = pd.read_csv(os.path.join(module_path, 'bulk_df.csv'))
 
-def plot_minEseg_prop(df,
+def plot_minEseg_prop_vs_Z(df,
                       y_prop="E_seg",
                       x_prop="Z",
                       ylabel=r"$\rm{min}(E_{\rm{seg}})$ (eV)",
@@ -397,110 +502,6 @@ def calc_C_GB(Temperature,c_bulk,E_seg):
     c_GB = np.divide(c_bulk * np.exp(-E_seg/(8.6173303e-05*Temperature))\
         ,(1 - c_bulk + c_bulk * np.exp(-E_seg/(8.6173303e-05*Temperature))))
     return c_GB
-class GB_symmetries():
-    def __init__(self):
-        # S3 S111
-        studied_list = [20, 22, 24, 26, 28, 30, 32, 34, 36]
-        # 0.5-1ML available
-        symmetry = [[21, 52, 53],\
-                    [23, 50, 51],\
-                    [25, 48, 49],\
-                    [27, 46, 47],\
-                    [29, 44, 45],\
-                    [31, 42, 43],\
-                    [33, 40, 41],\
-                    [35, 38, 39],\
-                    [37]]
-        # When the site is on the GB plane, we don't need to calculate values on both sides
-        self.S3_1_symmetrydict = dict(zip(studied_list,symmetry))
-        
-        # S3 S112
-        studied_list = [12, 14, 16, 18, 20, 22, 24]
-        # 0.5-1ML available
-        symmetry = [[13, 36, 37],\
-                    [15, 34, 35],\
-                    [17, 32, 33],\
-                    [19, 30, 31],\
-                    [21, 28, 29],\
-                    [23, 26, 27],\
-                    [25]]
-        # When the site is on the GB plane, we don't need to calculate values on both sides
-        self.S3_2_symmetrydict = dict(zip(studied_list,symmetry))
-        
-        # S9
-        studied_list = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
-        # only 0-1 ML available
-        symmetry = [[47],\
-                [46],\
-                [45],\
-                [44],\
-                [43],\
-                [42],\
-                [41],\
-                [40],\
-                [39],\
-                [38],\
-                [37],\
-                [],\
-                [],\
-                []]
-        # When the site is on the GB plane, we don't need to calculate values on both sides
-        self.S9_symmetrydict = dict(zip(studied_list,symmetry))
-        
-        # S11
-        studied_list = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
-        # only 0-1 ML available
-        symmetry = [[32],\
-                    [31],\
-                    [30],\
-                    [29],\
-                    [28],\
-                    [27],\
-                    [26],\
-                    [25],\
-                    [24],\
-                    [23],\
-                    [],\
-                    []]
-        self.S11_symmetrydict = dict(zip(studied_list,symmetry))
-        
-        #S5 210
-        studied_list = [24, 27, 29, 31, 33, 35, 37]
-        # ML not well defined, should be 0,0.5,1 ML but middle plane has two inequivalent sites
-        symmetry = [[25] + [46, 47],\
-                    [26] + [44, 45],\
-                    [28] + [42, 43],\
-                    [30] + [40, 41],\
-                    [32] + [38, 39],\
-                    [34],\
-                    [36]]
-        self.S5_2_symmetrydict = dict(zip(studied_list,symmetry))
-
-        # S5 310
-        # 0/0.25/0.5/0.75/1 ML
-        studied_list = [23, 27, 33, 37, 40]
-        symmetry = [[22, 24, 25] + [54, 55, 56, 57],\
-                    [26, 28, 29] + [50, 51 ,52, 53],\
-                    [30, 31, 32] + [46, 47, 48, 49],\
-                    [34, 35, 36] + [42, 43, 44, 45],\
-                    [38, 39, 41]]
-        self.S5_3_symmetrydict = dict(zip(studied_list,symmetry))
-        
-        name_list = ['S9_RA110_S2_21',
-        'S11_RA110_S3_32',
-        'S3_RA110_S1_12',
-        'S3_RA110_S1_11',
-        'S5_RA001_S310',
-        'S5_RA001_S210']
-        
-        self.symmetry_dict_all = dict(zip(name_list,
-                                          [self.S9_symmetrydict,
-                                           self.S11_symmetrydict,
-                                           self.S3_2_symmetrydict,
-                                           self.S3_1_symmetrydict,
-                                           self.S5_3_symmetrydict,
-                                           self.S5_2_symmetrydict])
-                                     )
 
 def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
                            xlabel=r"$\rm{R}_{\rm{W_{\rm{sep}}}}$", ylabel=r"$\rm{R}_{\rm{ANSBO}}$",
@@ -591,12 +592,16 @@ def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
     return fig, ax_scatter
 
 ## Figure 10
-def plot_property(df,
+def plot_prop_vs_prop(df,
                   x_prop,
                   y_prop,
                   figsize=(20,16),
                   x_label = r"E$_{\rm{seg}}$ (eV)",
+                  x_label_fontsize = 30,
+                  xtick_fontsize = 30,
                   y_label = r"W$_{\rm{sep}}^{\rm{RGS}}$ (J/m$^2$)",
+                  y_label_fontsize = 30,
+                  ytick_fontsize = 30,
                   element_groups = None,
                   text_labels = None,
                   legend_posn = (0.001,0.681),
@@ -649,12 +654,12 @@ def plot_property(df,
                             borderpad=0.1,    # Reduces space between the text and legend border
                             labelspacing=0.15)
 
-    ax1.tick_params(axis='y', labelsize=40, rotation=90)
-    ax1.tick_params(axis='x', which='both', labelsize=40)
+    ax1.tick_params(axis='y', labelsize=xtick_fontsize, rotation=90)
+    ax1.tick_params(axis='x', which='both', labelsize=ytick_fontsize)
     ax1.grid(which="both")
 
-    plt.xlabel(x_label, fontsize=40)
-    plt.ylabel(y_label, fontsize=40)
+    plt.xlabel(x_label, fontsize=x_label_fontsize)
+    plt.ylabel(y_label, fontsize=y_label_fontsize)
     
     # Setting x and y limits if provided
     if xlims is not None:
