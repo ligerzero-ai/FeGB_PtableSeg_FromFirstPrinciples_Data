@@ -1,0 +1,12 @@
+rm: cannot remove 'CHGCAR': No such file or directory
+rm: cannot remove 'REPORT': No such file or directory
+rm: cannot remove 'DOSCAR.*': No such file or directory
+./
+./std_err.txt
+./DDEC6_even_tempered_net_atomic_charges.xyz
+./KPOINTS
+./POSCAR
+./OSZICAR
+./vasprun.xml
+./DOSCAR
+./StaticImage-DDEC6-custodian.py

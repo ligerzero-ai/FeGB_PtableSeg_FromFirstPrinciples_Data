@@ -478,7 +478,7 @@ def plot_coverage_vs_temperature(df,
     ax2 = ax1.twiny()
     ax2.set_xlim(ax1.get_xlim())
     ax2.set_xticks(kelvin_ticks)
-    ax2.set_xticklabels([f"{c}°C" for c in celsius_ticks])
+    ax2.set_xticklabels([f"{c}" for c in celsius_ticks])
     ax2.set_xlabel("Temperature (°C)", fontsize=24)
     ax2.tick_params(axis='x', labelsize=24)
 

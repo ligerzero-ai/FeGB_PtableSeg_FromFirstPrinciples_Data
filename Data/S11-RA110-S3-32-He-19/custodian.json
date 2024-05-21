@@ -1,0 +1,49 @@
+[
+    {
+        "job": {
+            "@module": "custodian.vasp.jobs",
+            "@class": "VaspJob",
+            "@version": "2022.5.26",
+            "vasp_cmd": [
+                "srun",
+                "--export=ALL",
+                "-N",
+                "1",
+                "-n",
+                "128",
+                "vasp_std"
+            ],
+            "output_file": "vasp.log",
+            "stderr_file": "std_err.txt",
+            "suffix": "",
+            "final": true,
+            "backup": true,
+            "auto_npar": false,
+            "auto_gamma": true,
+            "settings_override": [
+                {
+                    "dict": "INCAR",
+                    "action": {
+                        "_set": {
+                            "NSW": 0,
+                            "LAECHG": true,
+                            "LCHARGE": true,
+                            "NELM": 300,
+                            "EDIFF": 1e-05
+                        }
+                    }
+                }
+            ],
+            "gamma_vasp_cmd": null,
+            "copy_magmom": false,
+            "auto_continue": false
+        },
+        "corrections": [],
+        "handler": null,
+        "validator": null,
+        "max_errors": false,
+        "max_errors_per_job": false,
+        "max_errors_per_handler": false,
+        "nonzero_return_code": false
+    }
+]
