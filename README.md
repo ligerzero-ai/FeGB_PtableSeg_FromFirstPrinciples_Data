@@ -41,6 +41,10 @@ import pandas as pd
 df = pd.read_pickle("ptable_Fe_GB_df.pkl.gz", compression="gzip")
 ```
 
+A quick overview on how to regenerate the plots from the publication can be found in the QuickStart.ipynb notebook.
+It is divided into sections which show you how to regenerate each plot in the manuscript.
+It contains some convenience plotting functions which accepts parameters (GB, element) for exploring the dataset.
+
 ## Dataset Units
 
 In the provided dataframe, the columns are as follows:
