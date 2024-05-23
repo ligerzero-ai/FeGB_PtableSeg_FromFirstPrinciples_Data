@@ -145,6 +145,8 @@ class GB_symmetries():
 module_path = os.path.dirname(os.path.abspath(__file__))
 bulk_df = pd.read_csv(os.path.join(module_path, 'bulk_df.csv'))
 
+
+#%% Fig 3
 def plot_minEseg_prop_vs_Z(df,
                       y_prop="E_seg",
                       x_prop="Z",
@@ -208,74 +210,7 @@ def plot_minEseg_prop_vs_Z(df,
 
     return fig, ax1
 
-def plot_pivot_table(df,
-                 colormap_thresholds=[None, None],
-                 figsize=(18, 30),
-                 colormap='bwr',
-                 colormap_label='E$_{\\rm{seg}}$ (eV)',
-                 color_label_fontsize=20,
-                 colormap_tick_fontsize=12,
-                 xtick_fontsize=18,
-                 ytick_fontsize=12,
-                 threshold_low=None,
-                 threshold_high=None,
-                 transpose_axes=False):
-    """
-    Plot a heatmap with custom parameters.
-
-    Parameters:
-    - df: DataFrame to plot.
-    - colormap_thresholds: List with [vmin, vmax] for the colormap, default is [-1, 1].
-    - figsize: Tuple for figure size (width, height), default is (18, 30).
-    - colormap: String for the colormap name, default is 'bwr'.
-    - colormap_label: Label for the colorbar, default is 'E$_{\\rm{seg}}$ (eV)'.
-    - fontsize: Font size for the colorbar label, default is 20.
-    - xtick_fontsize: Font size for x-axis tick labels, default is 18.
-    - ytick_fontsize: Font size for y-axis tick labels, default is 12.
-    - threshold_low: Lower threshold to filter data; defaults to None.
-    - threshold_high: Higher threshold to filter data; defaults to None.
-    - transpose_axes: Boolean to transpose the DataFrame; defaults to False.
-    """
-    if threshold_low is not None or threshold_high is not None:
-        df = df.copy()
-        df[(df < threshold_low) | (df > threshold_high)] = np.nan
-    
-    if transpose_axes:
-        df = df.T
-
-    fig, axs = plt.subplots(nrows=1, ncols=1, figsize=figsize)
-    cmap = plt.cm.get_cmap(colormap)
-    cmap.set_bad('k')
-    if colormap_thresholds == [None, None]:
-        vmax = max(abs(np.nanmin(df.max())), abs(np.nanmin(df.min())))
-        vmin = -vmax
-    else:
-        vmin, vmax = colormap_thresholds
-    im = axs.imshow(df, cmap=cmap, vmax=vmax, vmin=vmin)
-    cm = plt.colorbar(im, ax=axs, shrink=0.3, location='right', pad=0.01)
-    cm.set_label(colormap_label, rotation=270, labelpad=15, fontsize=color_label_fontsize)
-    # cm.ax.tick_params(labelsize=colormap_tick_fontsize)  # Set colorbar tick label size
-    if colormap_thresholds != [None, None]:
-        ticks = cm.get_ticks()
-        if len(ticks) > 1:  # Check to ensure there are ticks to modify
-            tick_labels = [f"$<{vmin}$" if i == 0 else f"$>{vmax}$" if i == len(ticks)-1 else str(tick) for i, tick in enumerate(ticks)]
-            cm.set_ticks(ticks)  # Set the ticks back if they were changed
-            cm.set_ticklabels(tick_labels, fontsize=colormap_tick_fontsize)  # Set the modified tick labels
-    else:
-        cm.set_ticklabels(cm.get_ticks(), fontsize=colormap_tick_fontsize)  # Set the modified tick labels
-
-    plt.xticks(np.arange(len(df.columns)), df.columns, rotation=0, fontsize=xtick_fontsize)
-    plt.yticks(np.arange(len(df.index)), df.index, fontsize=ytick_fontsize)
-
-    axs.xaxis.set_major_locator(ticker.MultipleLocator(1))
-    axs.yaxis.set_major_locator(ticker.MultipleLocator(1))
-    axs.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
-    axs.yaxis.set_minor_locator(ticker.MultipleLocator(0.5))
-
-    axs.tick_params(axis='both', which='major', width=1.5, length=4)
-    axs.grid(which='minor', color='black', linestyle='-', linewidth=1)
-    
-    return fig, axs
+#%% Fig 5
 
 def periodic_table_plot(plot_df, 
                         property="Eseg_min",
@@ -404,11 +339,7 @@ def periodic_table_plot(plot_df,
     plt.close()
     return fig, ax
 
-def get_GB_area(df_seg, GB):
-    df_GB = df_seg[df_seg["GB"] == GB]
-    struct = Structure.from_str(df_GB.structure.iloc[0], fmt="json")
-    area  = struct.volume/struct.lattice.c*0.01 # Area in nm^2
-    return area
+#%% Fig 6
 
 def plot_coverage_vs_temperature(df,
                                  df_spectra,
@@ -432,13 +363,13 @@ def plot_coverage_vs_temperature(df,
     for GB, GB_df in df_ele.groupby(by="GB"):
         temp_concs = []
         for temp in temperature_range:
-            site_concentrations = calc_C_GB(temp, alloy_conc * 0.01, np.array(GB_df.total_spectra.values[0]))
+            site_concentrations = calc_C_GB(temp, alloy_conc * 0.01, np.array(GB_df.full_seg_spectra.values[0]))
             temp_concs.append(site_concentrations.sum() / get_GB_area(df, GB=GB))
         plot_data.append((temperature_range, temp_concs, GB))
         
-        min_total_spectra = min(GB_df.total_spectra.values[0])
+        min_total_spectra = min(GB_df.full_seg_spectra.values[0])
         # Format the label to just include the GB, no min(E_seg)
-        min_total_spectra = min(GB_df.total_spectra.values[0])
+        min_total_spectra = min(GB_df.full_seg_spectra.values[0])
         label = f"{gb_latex_dict[GB]} {min_total_spectra:.2f} eV"
         legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', label=label,
                                           markerfacecolor=custom_colors[GB], markersize=15, linestyle='None'))
@@ -489,6 +420,81 @@ def plot_coverage_vs_temperature(df,
         plt.close(fig)  # Close the figure to avoid display
         
     return fig, ax1
+#%% Fig 7a
+def plot_pivot_table(df,
+                 colormap_thresholds=[None, None],
+                 figsize=(18, 30),
+                 colormap='bwr',
+                 colormap_label='E$_{\\rm{seg}}$ (eV)',
+                 color_label_fontsize=20,
+                 colormap_tick_fontsize=12,
+                 xtick_fontsize=18,
+                 ytick_fontsize=12,
+                 threshold_low=None,
+                 threshold_high=None,
+                 transpose_axes=False):
+    """
+    Plot a heatmap with custom parameters.
+
+    Parameters:
+    - df: DataFrame to plot.
+    - colormap_thresholds: List with [vmin, vmax] for the colormap, default is [-1, 1].
+    - figsize: Tuple for figure size (width, height), default is (18, 30).
+    - colormap: String for the colormap name, default is 'bwr'.
+    - colormap_label: Label for the colorbar, default is 'E$_{\\rm{seg}}$ (eV)'.
+    - fontsize: Font size for the colorbar label, default is 20.
+    - xtick_fontsize: Font size for x-axis tick labels, default is 18.
+    - ytick_fontsize: Font size for y-axis tick labels, default is 12.
+    - threshold_low: Lower threshold to filter data; defaults to None.
+    - threshold_high: Higher threshold to filter data; defaults to None.
+    - transpose_axes: Boolean to transpose the DataFrame; defaults to False.
+    """
+    if threshold_low is not None or threshold_high is not None:
+        df = df.copy()
+        df[(df < threshold_low) | (df > threshold_high)] = np.nan
+    
+    if transpose_axes:
+        df = df.T
+
+    fig, axs = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+    cmap = plt.cm.get_cmap(colormap)
+    cmap.set_bad('k')
+    if colormap_thresholds == [None, None]:
+        vmax = max(abs(np.nanmin(df.max())), abs(np.nanmin(df.min())))
+        vmin = -vmax
+    else:
+        vmin, vmax = colormap_thresholds
+    im = axs.imshow(df, cmap=cmap, vmax=vmax, vmin=vmin)
+    cm = plt.colorbar(im, ax=axs, shrink=0.3, location='right', pad=0.01)
+    cm.set_label(colormap_label, rotation=270, labelpad=15, fontsize=color_label_fontsize)
+    # cm.ax.tick_params(labelsize=colormap_tick_fontsize)  # Set colorbar tick label size
+    if colormap_thresholds != [None, None]:
+        ticks = cm.get_ticks()
+        if len(ticks) > 1:  # Check to ensure there are ticks to modify
+            tick_labels = [f"$<{vmin}$" if i == 0 else f"$>{vmax}$" if i == len(ticks)-1 else str(tick) for i, tick in enumerate(ticks)]
+            cm.set_ticks(ticks)  # Set the ticks back if they were changed
+            cm.set_ticklabels(tick_labels, fontsize=colormap_tick_fontsize)  # Set the modified tick labels
+    else:
+        cm.set_ticklabels(cm.get_ticks(), fontsize=colormap_tick_fontsize)  # Set the modified tick labels
+
+    plt.xticks(np.arange(len(df.columns)), df.columns, rotation=0, fontsize=xtick_fontsize)
+    plt.yticks(np.arange(len(df.index)), df.index, fontsize=ytick_fontsize)
+
+    axs.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    axs.yaxis.set_major_locator(ticker.MultipleLocator(1))
+    axs.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
+    axs.yaxis.set_minor_locator(ticker.MultipleLocator(0.5))
+
+    axs.tick_params(axis='both', which='major', width=1.5, length=4)
+    axs.grid(which='minor', color='black', linestyle='-', linewidth=1)
+    
+    return fig, axs
+
+def get_GB_area(df_seg, GB):
+    df_GB = df_seg[df_seg["GB"] == GB]
+    struct = Structure.from_str(df_GB.structure.iloc[0], fmt="json")
+    area  = struct.volume/struct.lattice.c*0.01 # Area in nm^2
+    return area
 
 def calc_C_GB(Temperature,c_bulk,E_seg):
     """
@@ -503,6 +509,127 @@ def calc_C_GB(Temperature,c_bulk,E_seg):
         ,(1 - c_bulk + c_bulk * np.exp(-E_seg/(8.6173303e-05*Temperature))))
     return c_GB
 
+def plot_interfacial_coverage_vs_minEseg(df, df_spectra, elements_to_plot, atomic_pct_conc=0.1, temp=300, nan_segregation=[], gb_latex_dict={}, custom_colors={}):
+    df_copy = df_spectra.copy()
+
+    interf_conc_300 = []
+    interf_conc_300_lst = []
+
+
+    for _, row in df_copy.iterrows():
+        interfactial_conc_persite = calc_C_GB(temp, atomic_pct_conc*0.01, np.array(row.full_seg_spectra))
+        interfacial_conc = interfactial_conc_persite.sum() / get_GB_area(df, row.GB)
+        interf_conc_300.append(interfacial_conc)
+        interf_conc_300_lst.append(interfactial_conc_persite)
+
+    df_copy["interf_conc_300"] = interf_conc_300
+    df_copy["interf_conc_300_persite"] = interf_conc_300_lst
+    df_copy["min_Eseg"] = df_copy.full_seg_spectra.apply(min)
+    df_copy["GB_element"] = [f"{row.GB}_{int(row.Z)}" for _, row in df_copy.iterrows()]
+
+    fig, ax = plt.subplots(figsize=(12, 9))
+
+    for gb, gb_df in df_copy[df_copy["element"].isin(elements_to_plot)].groupby("GB"):
+        plot_df = gb_df[gb_df["min_Eseg"] > -1]
+        plot_df = plot_df[plot_df["min_Eseg"] < 0]
+        plot_df = plot_df[~plot_df["GB_element"].isin(nan_segregation)]
+        ax.scatter(plot_df["min_Eseg"], plot_df["interf_conc_300"], label=gb_latex_dict.get(gb, gb), c=custom_colors.get(gb, 'blue'), s=100)
+
+        # Add text labels for each point
+        for idx, row in plot_df.iterrows():
+            ax.text(row["min_Eseg"], row["interf_conc_300"], row["element"], fontsize=20)
+
+    # Get current handles and labels
+    handles, labels = ax.get_legend_handles_labels()
+
+    # Move the first legend entry to the end
+    handles.append(handles.pop(0))
+    labels.append(labels.pop(0))
+
+    # Create the new legend
+    ax.legend(handles, labels, loc='upper right', bbox_to_anchor=(1.01, 1.015), fontsize=16, handletextpad=0.1, borderpad=0.2)
+
+    ax.set_ylabel(r"Interfacial coverage (atoms/nm$^2$)", fontsize=24)
+    ax.set_xlabel(r"min(E$_{\rm{seg}}$) (eV)", fontsize=24)
+
+    plt.xticks(fontsize=24)
+    plt.yticks(fontsize=24)
+
+    ax.text(0.0, 0.0, f"T: {temp} K\n" + r"C$_{\rm{b}}$:" + f" {atomic_pct_conc} at.%", 
+            transform=ax.transAxes, fontsize=30, verticalalignment='bottom', horizontalalignment="left")
+    ax.set_ylim([0, None])
+    ax.set_xlim([None, 0])
+    return fig, ax
+
+#%%% Fig 7b
+def calculate_effective_temperature_eseg(y, T, cB, kB=8.6173303e-05):
+    """
+    Calculate the effective segregation energy Eseg of the spectra from the given parameters.
+
+    Parameters:
+    y (float): The term from the equation.
+    T (float): The temperature in Kelvin.
+    cB (float): The concentration of B.
+    kB (float): The Boltzmann constant, default 1.38e-23 J/K.
+
+    Returns:
+    float: The calculated segregation energy Eseg in Joules.
+    """
+    if y * cB - cB == 0:
+        return np.nan
+        #raise ValueError("The denominator becomes zero, adjust your input values.")
+    
+    numerator = y * cB - y
+    denominator = y * cB - cB
+    Eseg = -kB * T * np.log(numerator / denominator)
+    return Eseg
+
+def plot_Eseg_vs_temperature(df_spectra, element_to_plot, gb_latex_dict, custom_colors, alloy_conc=0.01 * 0.087, temp_range=(100, 1000), temp_step=20):
+    temperatures = np.arange(temp_range[0], temp_range[1] + temp_step, temp_step)
+    
+    df_ele = df_spectra[df_spectra["element"] == element_to_plot]
+    fig, ax1 = plt.subplots(figsize=(12, 9))
+
+    for GB, GB_df in df_ele.groupby(by="GB"):
+        temp_effective_Esegs = []
+        plot_data = []
+        legend_labels = []
+
+        for temp in temperatures:
+            site_concentrations = calc_C_GB(temp, alloy_conc, np.array(GB_df.full_seg_spectra.values[0]))
+            temp_effective_Eseg = calculate_effective_temperature_eseg(site_concentrations.mean(), T=temp, cB=alloy_conc)
+            temp_effective_Esegs.append(temp_effective_Eseg)
+
+        plot_data.append((temperatures, temp_effective_Esegs, GB))
+        legend_labels.append(gb_latex_dict.get(GB, GB))
+        legend_elements = []
+
+        for data in plot_data:
+            color = custom_colors.get(data[2], 'blue')
+            ax1.plot(data[0], data[1], linewidth=8, color=color)
+            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', label=gb_latex_dict.get(data[2], data[2]),
+                                              markerfacecolor=color, markersize=15, linestyle='None'))
+
+    text_str = f'{element_to_plot}\n{alloy_conc*100:.3f} at.%'
+    ax1.text(0.05, 0.05, text_str, transform=ax1.transAxes, fontsize=40, verticalalignment='bottom', horizontalalignment='left')
+
+    ax1.set_xlabel("Temperature (K)", fontsize=24)
+    ax1.set_ylabel("Effective segregation energy  (eV)", fontsize=24)
+    ax1.tick_params(labelsize=24)
+    ax1.grid()
+
+    kelvin_ticks = [73, 273, 473, 673, 873, 1073]
+    celsius_ticks = [k - 273 for k in kelvin_ticks]
+
+    ax2 = ax1.twiny()
+    ax2.set_xlim(ax1.get_xlim())
+    ax2.set_xticks(kelvin_ticks)
+    ax2.set_xticklabels([f"{c}" for c in celsius_ticks])
+    ax2.set_xlabel("Temperature (°C)", fontsize=24)
+    ax2.tick_params(axis='x', labelsize=24)
+
+    return fig, ax1
+#%% Fig 9a
 def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
                            xlabel=r"$\rm{R}_{\rm{W_{\rm{sep}}}}$", ylabel=r"$\rm{R}_{\rm{ANSBO}}$",
                            xlabel_fontsize=24, ylabel_fontsize=24, legend_fontsize=12,
@@ -591,7 +718,71 @@ def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
 
     return fig, ax_scatter
 
-## Figure 10
+#%% Fig 9b
+def create_prop_vs_temp_plot(plot_data, file_name, legend_elements, xlims, element_text, alloy_conc, ylabel_text, custom_colors, gb_latex_dict, legend=False):
+    fig, ax = plt.subplots(figsize=(12, 8))
+    for data in plot_data:
+        color = custom_colors.get(data[2], 'grey')
+        ax.plot(data[0], data[1], label=gb_latex_dict.get(data[2], 'Unknown'), linewidth=8, color=color)
+
+    ax.set_xlabel(r"Temperature (K)", fontsize=24)
+    ax.set_ylabel(ylabel_text, fontsize=24)
+    ax.tick_params(labelsize=20)
+    ax.grid(True)
+    
+    if xlims:
+        ax.set_xlim([max(0, xlims[0]), xlims[1]])
+    if legend:
+        ax.legend(handles=legend_elements, fontsize=22, frameon=True, handletextpad=0.01, borderpad=0.05, labelspacing=0.3)
+
+    # Additional text
+    text_str = f'{element_text}\n{alloy_conc*100:.2f} at.%'
+    ax.text(0.05, 0.05, text_str, transform=ax.transAxes, fontsize=40, verticalalignment='bottom', horizontalalignment='left')
+    
+    # fig.savefig(f'{fig_dir}/TempEffectiveCohesion/{file_name}_{element_text}_{alloy_conc*100:.2f}.png', dpi=300, bbox_inches='tight', pad_inches=0.1)
+    # plt.close(fig)
+    return fig, ax
+
+def plot_cohesion_vs_temp(df_spectra,
+                          element_to_plot,
+                          alloy_conc,
+                          temp_range,
+                          temp_step,
+                          custom_colors,
+                          gb_latex_dict,
+                          xlims,
+                          cohesion_type="ANSBO"):
+    temperature_range = np.arange(temp_range[0], temp_range[1] + temp_step, temp_step)
+    plot_data = []
+    legend_elements = []
+
+    for element, ele_df in df_spectra.groupby("element"):
+        if element != element_to_plot:
+            continue
+
+        for _, row in ele_df.iterrows():
+            temp_concs = []
+
+            for temp in temperature_range:
+                concentration = calc_C_GB(temp, alloy_conc, np.array(row.full_seg_spectra))
+                eff_coh_eff = np.array(row[f'eta_coh_{cohesion_type}_spectra']) * concentration
+                temp_concs.append(eff_coh_eff.sum())
+
+            plot_data.append((temperature_range, temp_concs, row.GB))
+
+            color = custom_colors.get(row.GB, 'grey')
+            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', label=gb_latex_dict.get(row.GB, 'Unknown'),
+                                              markerfacecolor=color, markersize=15, linestyle='None'))
+        legend_elements.append(legend_elements.pop(0))
+
+    ylabel_text = r"$\sum_i P_i \eta_i^{R_{" + cohesion_type + r"}}$"
+    fig, ax = create_prop_vs_temp_plot(
+        plot_data, f"EffectiveCohesion_vs_Temp_{cohesion_type}", legend_elements, xlims, element_to_plot, alloy_conc,
+        ylabel_text, custom_colors, gb_latex_dict, legend=False)
+
+    return fig, ax
+
+#%% Figure 10
 def plot_prop_vs_prop(df,
                   x_prop,
                   y_prop,
@@ -670,3 +861,223 @@ def plot_prop_vs_prop(df,
     if savefig_path is not None:
         plt.savefig(savefig_path, bbox_inches='tight', pad_inches=0.1)
     return fig, ax1
+#%% Fig 11
+def plot_prop_vs_prop_GB(df, gb_to_plot='S5_RA001_S210', y_prop="R_DDEC6_ANSBO", x_prop="E_seg", 
+                             custom_colors=None, gb_latex_dict=None, fig_dir='.', 
+                             ylabel=r"R$_{\rm{ANSBO}}$= ANSBO$_{\rm{seg}}$/ANSBO$_{\rm{pure}}$", 
+                             xlabel=r"E$_{\rm{seg}}$ (eV)", figsize=(12, 12), 
+                             xlabel_fontsize=36, ylabel_fontsize=36, xtick_fontsize=20, 
+                             ytick_fontsize=24, point_label_fontsize=24, padding_fraction=0.001):
+    
+    # Filter and prepare data
+    filtered_df = df.copy()
+
+    # Get the range of x-axis and y-axis
+    x_range = filtered_df[x_prop].max() - filtered_df[x_prop].min()
+    y_range = filtered_df[y_prop].max() - filtered_df[y_prop].min()
+
+    # Calculate the padding in axes coordinates
+    padding_axes_x = padding_fraction * x_range
+    padding_axes_y = padding_fraction * y_range
+
+    # Filter the DataFrame for the specified GB
+    filtered_df = filtered_df[filtered_df["GB"] == gb_to_plot]
+
+    if filtered_df.empty:
+        print(f"No data available for GB: {gb_to_plot}")
+        return None, None
+
+    fig, ax1 = plt.subplots(figsize=figsize, dpi=80)
+    color = custom_colors.get(gb_to_plot, 'grey')  # Use custom colors from dictionary
+
+    # Minimum E_seg calculation per element
+    min_eseg_per_element = filtered_df.groupby("element").apply(lambda x: x.nsmallest(1, x_prop).iloc[0])
+    min_eseg_per_element = min_eseg_per_element[min_eseg_per_element[x_prop] <= 0]
+    min_eseg_per_element = min_eseg_per_element.sort_values(by='Z')
+
+    # Scatter plot with annotations
+    for _, row in min_eseg_per_element.iterrows():
+        x_value = row[x_prop]
+        y_value = row[y_prop]
+        # Apply padding by adding padding_axes_x to x_value
+        ax1.scatter(x_value, y_value, color="r", marker="o", s=40)
+        ax1.text(x_value - padding_axes_x, y_value, row["element"], color="k", verticalalignment='center', horizontalalignment='right', fontsize=point_label_fontsize)
+
+    # Text in the top left corner with large font size
+    ax1.text(0.02, 0.98, gb_latex_dict.get(gb_to_plot, gb_to_plot), color="k", fontsize=40, verticalalignment='top', horizontalalignment='left', transform=ax1.transAxes)
+
+    # Axes customization
+    ax1.axhline(1.00, color='r', linewidth=2, linestyle="--")
+    ax1.axvline(0, color='r', linewidth=2, linestyle="--")
+    
+    ax1.set_xlabel(xlabel, fontsize=xlabel_fontsize)
+    ax1.set_ylabel(ylabel, fontsize=ylabel_fontsize)
+    
+    ax1.tick_params(axis='x', labelsize=xtick_fontsize)
+    ax1.tick_params(axis='y', labelsize=ytick_fontsize)
+
+    ax1.grid(True)
+    # fig.savefig(f'{fig_dir}/SegregationEngineering_min_{x_prop}_vs_{y_prop}_{gb_to_plot}.png', dpi=300, bbox_inches='tight', pad_inches=0.1)
+    # plt.close(fig)
+
+    return fig, ax1
+
+#%% Fig 12
+
+#%%
+def periodic_table_dual_plot(plot_df, 
+                        property1="Eseg_min1",
+                        property2="Eseg_min2",  # New property
+                        count_min1=None,
+                        count_max1=None,
+                        count_min2=None,
+                        count_max2=None,
+                        center_cm_zero1=False,
+                        center_cm_zero2=False,
+                        center_point1=None,  # New parameter for arbitrary centering
+                        center_point2=None,
+                        property_name1=None,
+                        property_name2=None,
+                        cmap1=plt.cm.Blues,  # Colormap for the first property
+                        cmap2=plt.cm.Reds,  # Colormap for the second property
+                        element_font_color="darkgoldenrod"):
+    module_path = os.path.dirname(os.path.abspath(__file__))
+    ptable = pd.read_csv(os.path.join(module_path, 'periodic_table.csv'))
+    ptable.index = ptable['symbol'].values
+    elem_tracker = ptable['count']
+    ptable = ptable[ptable['Z'] <= 92]  # Cap at element 92
+
+    n_row = ptable['row'].max()
+    n_column = ptable['column'].max()
+
+    fig, ax = plt.subplots(figsize=(n_column, n_row))
+    rows = ptable['row']
+    columns = ptable['column']
+    symbols = ptable['symbol']
+    rw = 0.9  # rectangle width
+    rh = rw    # rectangle height
+
+    if count_min1 is None or count_min2 is None or count_max1 is None or count_max2 is None:
+        show_symbols = False
+    else:
+        show_symbols = True
+    
+    if count_min1 is None:
+        count_min1 = plot_df[property1].min()
+    if count_max1 is None:
+        count_max1 = plot_df[property1].max()
+
+    # Adjust normalization based on centering preference
+    if center_cm_zero1:
+        cm_threshold1 = max(abs(count_min1), abs(count_max1))
+        norm1 = Normalize(-cm_threshold1, cm_threshold1)
+    elif center_point1 is not None:
+        # Adjust normalization to center around the arbitrary point
+        max_diff = max(center_point1 - count_min1, count_max1 - center_point1)
+        norm1 = Normalize(center_point1 - max_diff, center_point1 + max_diff)
+    else:
+        norm1 = Normalize(vmin=count_min1, vmax=count_max1)
+
+    if count_min2 is None:
+        count_min2 = plot_df[property2].min()
+    if count_max2 is None:
+        count_max2 = plot_df[property2].max()
+
+    # Adjust normalization based on centering preference for the second property
+    if center_cm_zero2:
+        cm_threshold2 = max(abs(count_min2), abs(count_max2))
+        norm2 = Normalize(-cm_threshold2, cm_threshold2)
+    elif center_point2 is not None:
+        # Adjust normalization to center around the arbitrary point for the second property
+        max_diff2 = max(center_point2 - count_min2, count_max2 - center_point2)
+        norm2 = Normalize(center_point2 - max_diff2, center_point2 + max_diff2)
+    else:
+        norm2 = Normalize(vmin=count_min2, vmax=count_max2)
+
+    for row, column, symbol in zip(rows, columns, symbols):
+        row = ptable['row'].max() - row
+        # Initial color set to 'none' for both properties
+        color1, color2 = 'none', 'none'
+
+        if symbol in plot_df.element.unique():
+            element_data = plot_df[plot_df["element"] == symbol]
+            if property1 in element_data and not element_data[property1].isna().all():
+                value1 = element_data[property1].values[0]
+                color1 = cmap1(norm1(value1))
+            if property2 in element_data and not element_data[property2].isna().all():
+                value2 = element_data[property2].values[0]
+                color2 = cmap2(norm2(value2))
+
+        # Draw upper right triangle for property1
+        triangle1 = patches.Polygon([(column, row), (column + rw, row), (column + rw, row + rh)], 
+                                    closed=True, color=color1)
+        ax.add_patch(triangle1)
+        
+        # Draw lower left triangle for property2
+        triangle2 = patches.Polygon([(column, row), (column, row + rh), (column + rw, row + rh)], 
+                                    closed=True, color=color2)
+        ax.add_patch(triangle2)
+
+        # Element symbol
+        plt.text(column + rw / 2, row + rh / 2, symbol,
+                 horizontalalignment='center',
+                 verticalalignment='center',
+                 fontsize=22,  # Adjusted for visibility
+                 fontweight='semibold',
+                 color=element_font_color)
+    position1 = 3.5, 7.8
+    position2 = 3.5, 9.4
+    # draw_color_bar(fig, ax, norm1, cmap1, property_name1, position1, granularity=20)
+    # draw_color_bar(fig, ax, norm2, cmap2, property_name2, position2, granularity=20)
+    draw_color_bar(fig, ax, norm1, cmap1, property_name1, position1, show_symbols, granularity=20)
+    draw_color_bar(fig, ax, norm2, cmap2, property_name2, position2, show_symbols, granularity=20)
+
+    ax.set_ylim(-0.15, n_row + .1)
+    ax.set_xlim(0.85, n_column + 1.1)
+    ax.axis('off')
+    
+    plt.draw()
+    plt.pause(0.001)
+    plt.close()
+    return fig, ax
+
+def draw_color_bar(fig, ax, norm, cmap, property_name, position, show_symbols=True, granularity=20):
+    colormap_array = np.linspace(norm.vmin, norm.vmax, granularity)
+    
+    length = 9
+    width = length / granularity
+    height = 0.35
+    x_offset, y_offset = position
+
+    for i, value in enumerate(colormap_array):
+        color = cmap(norm(value))
+        color = 'silver' if value == 0 and not norm.vmin <= 0 <= norm.vmax else color
+        x_loc = i / granularity * length + x_offset
+        
+        rect = patches.Rectangle((x_loc, y_offset), width, height,
+                                 linewidth=1.5,
+                                 edgecolor='gray',
+                                 facecolor=color,
+                                 alpha=1)
+        ax.add_patch(rect)
+
+        if i in [0, granularity//4, granularity//2, 3*granularity//4, granularity-1]:
+            label = f'{value:.1f}'
+            if show_symbols:
+                if i == 0:
+                    label = "<" + label
+                elif i == granularity - 1:
+                    label = ">" + label
+            
+            plt.text(x_loc + width / 2, y_offset - 0.4, label,
+                     horizontalalignment='center',
+                     verticalalignment='center',
+                     fontweight='semibold',
+                     fontsize=20, color='k')
+
+    plt.text(x_offset + length / 2, y_offset + 0.75,
+             property_name,
+             horizontalalignment='center',
+             verticalalignment='center',
+             fontweight='semibold',
+             fontsize=24, color='k')
