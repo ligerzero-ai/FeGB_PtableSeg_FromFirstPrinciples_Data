@@ -457,7 +457,7 @@ def plot_pivot_table(df,
         df = df.T
 
     fig, axs = plt.subplots(nrows=1, ncols=1, figsize=figsize)
-    cmap = plt.cm.get_cmap(colormap)
+    cmap = plt.get_cmap(colormap)
     cmap.set_bad('k')
     if colormap_thresholds == [None, None]:
         vmax = max(abs(np.nanmin(df.max())), abs(np.nanmin(df.min())))

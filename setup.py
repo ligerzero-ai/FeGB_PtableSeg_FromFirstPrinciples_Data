@@ -7,7 +7,8 @@ setup(
     install_requires=[
         "pymatgen==2023.10.11",
         "ipython",
-        "jupyter"
+        "jupyter",
+        "matplotlib==3.8.4"
     ],
     python_requires='>=3.9',
 )
