@@ -12,25 +12,28 @@ To install the latest version of this package directly from GitHub, you can use 
 ```bash
 pip install git+https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data
 ```
-### Using mamba
+### Using conda
 
-If you prefer to create a dedicated environment for this package using `mamba`, you can use the provided `environment.yml` file. This approach is recommended if you want to ensure that all specific binary dependencies are correctly installed. Follow these steps:
+If you prefer to create a dedicated environment for this package using mamba, you can use the provided environment.yml file. This approach is recommended if you want to ensure that all specific binary dependencies are correctly installed. Follow these steps:
 
-1. Create a new conda environment (install mamba with conda install mamba, mamba is faster conda):
+1. Install mamba if you haven't already:
+ ```bash
+ conda install mamba
+ ```
+2. Create a new conda environment (install mamba with conda install mamba, mamba is faster conda):
 ```bash
 mamba create -n FeGB_PtableSegData
 ```
-2. Clone the repository:
+3. Clone the repository:
 ```bash
 git clone https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data.git
 cd FeGB_PtableSeg_FromFirstPrinciples_Data
 ```
-3. Create the environment:
+4. Create the environment:
 ```bash
 mamba env create -f environment.yaml
 ```
-
-4. Activate the new environment:
+5. Activate the new environment:
 ```bash
 mamba activate FeGB_PtableSegData
 ```
