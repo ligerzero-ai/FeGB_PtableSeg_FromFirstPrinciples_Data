@@ -16,7 +16,7 @@ source venv/bin/activate  # Activate the virtual environment on macOS/Linux
 # .\venv\Scripts\activate  # Activate the virtual environment on Windows
 ```
 
-To install the latest version of this package directly from GitHub, you can use the following command:
+2. To install the latest version of this package directly from GitHub, you can use the following command:
 ```bash
 pip install git+https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data
 ```
@@ -29,7 +29,7 @@ If you prefer to create a dedicated environment for this package using mamba, yo
  ```bash
  conda install mamba
  ```
-2. Create a new conda environment (install mamba with conda install mamba, mamba is faster conda):
+2. Create a new conda environment:
 ```bash
 mamba create -n FeGB_PtableSegData
 ```
