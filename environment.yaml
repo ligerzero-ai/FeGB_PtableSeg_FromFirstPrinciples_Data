@@ -1,7 +1,11 @@
 name: FeGB_PtableSeg
+channels:
+  - conda-forge
 dependencies:
   - python>=3.9
   - pymatgen=2023.10.11
+  - pip
+  - ipython
+  - jupyter
   - pip:
     - -e .
-

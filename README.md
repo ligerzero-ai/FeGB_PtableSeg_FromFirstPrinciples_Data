@@ -16,19 +16,23 @@ pip install git+https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrincipl
 
 If you prefer to create a dedicated environment for this package using `mamba`, you can use the provided `environment.yml` file. This approach is recommended if you want to ensure that all specific binary dependencies are correctly installed. Follow these steps:
 
-1. Clone the repository:
+1. Create a new conda environment (install mamba with conda install mamba, mamba is faster conda):
+```bash
+mamba create -n FeGB_PtableSegData
+```
+2. Clone the repository:
 ```bash
 git clone https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data.git
 cd FeGB_PtableSeg_FromFirstPrinciples_Data
 ```
-2. Create the environment:
+3. Create the environment:
 ```bash
-mamba env create -f environment.yml
+mamba env create -f environment.yaml
 ```
 
-3. Activate the new environment:
+4. Activate the new environment:
 ```bash
-mamba activate your_env
+mamba activate FeGB_PtableSegData
 ```
 
 ## Usage
