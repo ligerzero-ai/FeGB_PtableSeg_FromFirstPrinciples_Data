@@ -8,10 +8,19 @@ You can install this package either using `pip` directly or by setting up a cond
 
 ### Using pip
 
+1. Create and activate a virtual environment:
+
+```bash
+python -m venv venv  # Create a virtual environment named 'venv'
+source venv/bin/activate  # Activate the virtual environment on macOS/Linux
+# .\venv\Scripts\activate  # Activate the virtual environment on Windows
+```
+
 To install the latest version of this package directly from GitHub, you can use the following command:
 ```bash
 pip install git+https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data
 ```
+
 ### Using conda
 
 If you prefer to create a dedicated environment for this package using mamba, you can use the provided environment.yml file. This approach is recommended if you want to ensure that all specific binary dependencies are correctly installed. Follow these steps:
