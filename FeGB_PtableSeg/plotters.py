@@ -3,6 +3,8 @@ import matplotlib.ticker as ticker
 import matplotlib.cm as cm
 from matplotlib.colors import Normalize
 import matplotlib.patches as patches
+import matplotlib.gridspec as gridspec
+import matplotlib.colors as mcolors  # Import for LogNorm
 
 import numpy as np
 import pandas as pd
@@ -164,9 +166,12 @@ def plot_minEseg_prop_vs_Z(df,
     # Create a plot
     fig, ax1 = plt.subplots(figsize=figsize)
 
+    # To store legend handles for each GB
+    legend_handles = []
+
     # Looping over each unique "GB" group
-    for idx, (gb, group) in enumerate(df.dropna(subset=[y_prop]).groupby("GB")):
-        color = custom_colors[gb]  # Custom color for each group
+    for gb, group in df.dropna(subset=[y_prop]).groupby("GB"):
+        color = custom_colors.get(gb, 'black')  # Get color for each group, default to 'black' if not found
 
         Eseg_col = "E_seg"
         # For each "GB" group, find the minimum "E_seg"
@@ -182,21 +187,22 @@ def plot_minEseg_prop_vs_Z(df,
         line1, = ax1.plot(x_values, y_values, color=color, linestyle='--', marker="o", linewidth=3, markersize=6)
         ax1.axhline(0, color=color)
 
-        # Creating legends
-        gb_legends = [(line1, f'{gb_latex_dict[gb]}') for gb in custom_colors]
+        # Collect legend entries if not already added
+        if gb not in [h.get_label() for h in legend_handles]:  # Avoid duplicates
+            legend_handles.append(line1)
 
     # Set labels and axis
     ax1.set_ylabel(ylabel, fontsize=ylabel_fontsize)
     if xtick_labels is not None:
         ax1.set_xticks(xtick_posns)
-        ax1.set_xticklabels(xtick_labels, fontsize=xtick_fontsize, rotation=90,va='center')
+        ax1.set_xticklabels(xtick_labels, fontsize=xtick_fontsize, rotation=90, va='center')
     ax1.tick_params(axis='y', labelsize=ytick_fontsize)
 
     if shift_xticks:
-        shifts = [-0.01, 0.04, 0.09, 0.14]  # Define y-shift values for three lines
         shifts = [-0.01, 0.04, 0.09]  # Define y-shift values for three lines
         for i, label in enumerate(ax1.get_xticklabels()):
             label.set_y(shifts[i % 3] + xtick_yshift)
+
     # Manually adding gridlines at specified intervals (1, 4, 7, 10, ..., up to 92)
     ax1.grid(False)  # Turn off grid
     gridline_positions = np.arange(1, 93, 3)  # Generate positions
@@ -204,9 +210,14 @@ def plot_minEseg_prop_vs_Z(df,
     for pos in gridline_positions:
         ax1.axvline(x=pos, linestyle='-', linewidth='0.5', color='grey', alpha=0.75)  # Adjust alpha for visibility if needed
 
-    # Creating a custom legend
-    gb_legend = plt.legend(*zip(*gb_legends), bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=legend_fontsize)
-    plt.gca().add_artist(gb_legend)
+    # Creating a custom legend with unique handles and labels, moving the first entry to the end
+    gb_legend_labels = [gb_latex_dict.get(gb, gb) for gb in custom_colors.keys()]
+
+    # Rearrange legend handles and labels
+    legend_handles = legend_handles[1:] + legend_handles[:1]
+    gb_legend_labels = gb_legend_labels[1:] + gb_legend_labels[:1]
+
+    plt.legend(legend_handles, gb_legend_labels, bbox_to_anchor=(0.63, 0.05), loc="lower left", fontsize=legend_fontsize)
 
     return fig, ax1
 
@@ -362,11 +373,11 @@ def plot_coverage_vs_temperature(df,
 
     for GB, GB_df in df_ele.groupby(by="GB"):
         temp_concs = []
+        # print(get_GB_area(df, GB=GB))
         for temp in temperature_range:
             site_concentrations = calc_C_GB(temp, alloy_conc * 0.01, np.array(GB_df.full_seg_spectra.values[0]))
             temp_concs.append(site_concentrations.sum() / get_GB_area(df, GB=GB))
         plot_data.append((temperature_range, temp_concs, GB))
-        
         min_total_spectra = min(GB_df.full_seg_spectra.values[0])
         # Format the label to just include the GB, no min(E_seg)
         min_total_spectra = min(GB_df.full_seg_spectra.values[0])
@@ -584,16 +595,17 @@ def calculate_effective_temperature_eseg(y, T, cB, kB=8.6173303e-05):
     Eseg = -kB * T * np.log(numerator / denominator)
     return Eseg
 
-def plot_Eseg_vs_temperature(df_spectra, element_to_plot, gb_latex_dict, custom_colors, alloy_conc=0.01 * 0.087, temp_range=(100, 1000), temp_step=20):
+def plot_Eseg_vs_temperature(df_spectra, element_to_plot, gb_latex_dict, custom_colors, alloy_conc=0.01 * 0.087, temp_range=(100, 1000), temp_step=20, legend_loc='center left', legend_bbox_to_anchor=None):
     temperatures = np.arange(temp_range[0], temp_range[1] + temp_step, temp_step)
     
     df_ele = df_spectra[df_spectra["element"] == element_to_plot]
     fig, ax1 = plt.subplots(figsize=(12, 9))
 
+    legend_elements = []  # Moved outside the loop to accumulate all entries
+
     for GB, GB_df in df_ele.groupby(by="GB"):
         temp_effective_Esegs = []
         plot_data = []
-        legend_labels = []
 
         for temp in temperatures:
             site_concentrations = calc_C_GB(temp, alloy_conc, np.array(GB_df.full_seg_spectra.values[0]))
@@ -601,14 +613,14 @@ def plot_Eseg_vs_temperature(df_spectra, element_to_plot, gb_latex_dict, custom_
             temp_effective_Esegs.append(temp_effective_Eseg)
 
         plot_data.append((temperatures, temp_effective_Esegs, GB))
-        legend_labels.append(gb_latex_dict.get(GB, GB))
-        legend_elements = []
 
         for data in plot_data:
             color = custom_colors.get(data[2], 'blue')
             ax1.plot(data[0], data[1], linewidth=8, color=color)
-            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', label=gb_latex_dict.get(data[2], data[2]),
-                                              markerfacecolor=color, markersize=15, linestyle='None'))
+            if data[2] not in [entry.get_label() for entry in legend_elements]:  # Prevent duplicate labels
+                legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
+                                                  label=gb_latex_dict.get(data[2], data[2]),
+                                                  markerfacecolor=color, markersize=15, linestyle='None'))
 
     text_str = f'{element_to_plot}\n{alloy_conc*100:.3f} at.%'
     ax1.text(0.05, 0.05, text_str, transform=ax1.transAxes, fontsize=40, verticalalignment='bottom', horizontalalignment='left')
@@ -628,7 +640,16 @@ def plot_Eseg_vs_temperature(df_spectra, element_to_plot, gb_latex_dict, custom_
     ax2.set_xlabel("Temperature (°C)", fontsize=24)
     ax2.tick_params(axis='x', labelsize=24)
 
+    # Move the first entry to the end of the legend
+    if legend_elements:
+        first_entry = legend_elements.pop(0)
+        legend_elements.append(first_entry)
+
+    # Add the legend with customizable location and bbox_to_anchor
+    ax1.legend(handles=legend_elements, fontsize=16, loc=legend_loc, bbox_to_anchor=legend_bbox_to_anchor)
+
     return fig, ax1
+
 #%% Fig 9a
 def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
                            xlabel=r"$\rm{R}_{\rm{W_{\rm{sep}}}}$", ylabel=r"$\rm{R}_{\rm{ANSBO}}$",
@@ -719,6 +740,196 @@ def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
     return fig, ax_scatter
 
 #%% Fig 9b
+def plot_single_stacked_histogram(df, 
+                                  x="E_seg",
+                                  xlabel=r"$\rm{R}_{\rm{W_{\rm{sep}}}}$", 
+                                  xlabel_fontsize=24,
+                                  ylabel="count",
+                                  ylabel_fontsize=24,
+                                  legend_fontsize=12,
+                                  legend_loc=(0.0, 0.8),
+                                  bin_width=0.02,
+                                  figsize=(14, 8),
+                                  hist_ticksize=20,
+                                  custom_colors=None,
+                                  gb_latex_dict=None, 
+                                  title=None,
+                                  title_fontsize=24):
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Prepare data for plotting by expanding based on site_multiplicity
+    df[f"full_multiplicity_{x}"] = [[row[x]] * int(np.round(row.site_multiplicity)) for _, row in df.iterrows()]
+
+    # Calculate global bin edges based on all data
+    all_x = np.concatenate(df[f"full_multiplicity_{x}"].explode().dropna().apply(np.ravel).tolist())
+    min_x = np.floor(min(all_x) / bin_width) * bin_width
+    max_x = np.ceil(max(all_x) / bin_width) * bin_width
+    bins = np.arange(min_x, max_x + bin_width, bin_width)
+
+    # Initialize bottom array for stacking
+    bottom = np.zeros(len(bins) - 1)
+
+    # Plot stacked histogram for each GB type
+    for gb_type, color in custom_colors.items():
+        gb_df = df[df['GB'] == gb_type]
+        
+        if gb_df.empty:
+            continue  # Skip if there are no rows for this GB type
+
+        plot_x = np.concatenate(gb_df[f"full_multiplicity_{x}"].explode().dropna().apply(np.ravel).tolist())
+        
+        if len(plot_x) == 0:
+            continue  # Skip if plot_x is empty
+
+        # Get histogram counts for the current GB group
+        counts, _ = np.histogram(plot_x, bins=bins)
+
+        # Plot the current GB group's data as a segment of the stacked histogram
+        ax.bar(bins[:-1], counts, width=np.diff(bins), bottom=bottom, align='edge', 
+               color=color, edgecolor='black', label=gb_latex_dict.get(gb_type, gb_type))
+        bottom += counts  # Update the bottom array for stacking
+
+    # Format the x-axis histogram
+    ax.set_xlabel(xlabel, fontsize=xlabel_fontsize)
+    ax.set_ylabel(ylabel, fontsize=ylabel_fontsize)
+    ax.tick_params(axis='both', which='major', labelsize=hist_ticksize)
+    ax.grid(True, which="both", alpha=0.5)
+
+    # Extract handles and labels for the legend
+    handles, labels = ax.get_legend_handles_labels()
+    if handles and labels:
+        # Reorder by popping the first entry and appending it to the end
+        first_handle = handles.pop(0)
+        first_label = labels.pop(0)
+        handles.append(first_handle)
+        labels.append(first_label)
+        
+        # Add reordered legend
+        fig.legend(handles, labels, loc="lower left", bbox_to_anchor=legend_loc, 
+                   bbox_transform=ax.transAxes, fontsize=legend_fontsize)
+
+    # Add a title if specified
+    if title:
+        ax.set_title(title, fontsize=title_fontsize)
+    plt.tight_layout()
+
+    return fig, ax
+
+# Define the function to calculate c_GB
+def calc_C_GB(Temperature, c_bulk, E_seg):
+    """
+    Calculate the grain boundary concentration.
+
+    :param Temperature: Temperature in Kelvin
+    :param c_bulk: Bulk concentration
+    :param E_seg: Segregation energy array for a given element at different sites
+    :return: Grain boundary concentration
+    """
+    c_GB = np.divide(c_bulk * np.exp(-E_seg/(8.6173303e-05 * Temperature)),
+                     (1 - c_bulk + c_bulk * np.exp(-E_seg/(8.6173303e-05 * Temperature))))
+    return c_GB
+
+def plot_gb_histogram_with_cGB(df,
+                               element,
+                               c_bulk,
+                               temperatures,
+                               ylims_hist=(0, 25),
+                               ylims_cGB=(0, 1.0),
+                               custom_colors=None,
+                               gb_latex_dict=None,
+                               xlabel=r"E$_{\rm{seg}}$ (eV)",
+                               xlabel_fontsize=20,
+                               ylabel=r"Available GB interface sites (atoms/nm$^2$)",
+                               ylabel_fontsize=20,
+                               ylabel2="Langmuir-McLean isotherm predicted probability of GB site occupation",
+                               ylabel2_fontsize=20,
+                               legend_fontsize=20,
+                               legend_loc=(0.0, 0.68),
+                               bin_width=0.05,
+                               figsize=(16, 12),
+                               hist_ticksize=20,
+                               title=None,
+                               title_fontsize=24):
+    """
+    Plot a stacked histogram for GB data and overlay Langmuir-McLean isotherm predictions.
+    
+    :param df: DataFrame containing GB data.
+    :param element: Element to filter the DataFrame.
+    :param c_bulk: Bulk concentration as a decimal.
+    :param temperatures: List of temperatures in Kelvin for c_GB calculations.
+    :param ylabel_2: Label for the secondary y-axis.
+    :param ylims_hist: Tuple for y-axis limits of the histogram.
+    :param ylims_cGB: Tuple for y-axis limits of the c_GB curves.
+    :param custom_colors: Dictionary of colors for different GB types.
+    :param gb_latex_dict: Dictionary for LaTeX labels for different GB types.
+    :param xlabel: Label for the x-axis.
+    :param xlabel_fontsize: Font size for the x-axis label.
+    :param ylabel: Label for the y-axis.
+    :param ylabel_fontsize: Font size for the y-axis label.
+    :param legend_fontsize: Font size for the legend.
+    :param legend_loc: Location of the legend.
+    :param bin_width: Width of the bins for the histogram.
+    :param figsize: Size of the figure.
+    :param hist_ticksize: Font size for the tick labels.
+    :param title: Title of the plot.
+    :param title_fontsize: Font size for the title.
+    """
+    # Filter data for the specified element
+    filtered_df = df[df["E_seg"] < 0]
+    filtered_df = filtered_df[filtered_df["element"] == element]
+    filtered_df["structure"] = filtered_df.structure.apply(lambda x: Structure.from_str(x, fmt="json"))
+    filtered_df["area"] = filtered_df.structure.apply(lambda x: x.volume / x.lattice.c)
+    filtered_df["site_multiplicity"] = [row.site_multiplicity / (0.01 * row.area) for _, row in filtered_df.iterrows()]
+
+    # Plot the stacked histogram
+    fig, ax = plot_single_stacked_histogram(
+        filtered_df,
+        x="E_seg",
+        xlabel=xlabel,
+        xlabel_fontsize=xlabel_fontsize,
+        ylabel=ylabel,
+        ylabel_fontsize=ylabel_fontsize,
+        legend_fontsize=legend_fontsize,
+        legend_loc=legend_loc,
+        bin_width=bin_width,
+        figsize=figsize,
+        hist_ticksize=hist_ticksize,
+        custom_colors=custom_colors,
+        gb_latex_dict=gb_latex_dict,
+        title=title,
+        title_fontsize=title_fontsize
+    )
+    ax.set_ylim(*ylims_hist)  # Set y-axis limits for histogram
+
+    # Create a secondary y-axis for c_GB curves
+    ax2 = ax.twinx()
+
+    # Define different line styles for the c_GB lines
+    line_styles = ['-', '--', '-.', ':', (0, (3, 1, 1, 1))]
+
+    # Prepare data for c_GB curves
+    E_seg = np.linspace(filtered_df.E_seg.min(), 0, 500)
+
+    # Plot c_GB curves for each temperature with different line styles
+    for i, T in enumerate(temperatures):
+        c_GB = calc_C_GB(T, c_bulk, E_seg)
+        ax2.plot(E_seg, c_GB, label=r'c${_{\rm{GB}}}$ @' + f'T={T} K',
+                 linewidth=10, linestyle=line_styles[i % len(line_styles)], color='black')
+
+    # Label and format secondary axis
+    ax2.set_ylabel(ylabel2, color='k', fontsize=ylabel2_fontsize)
+    ax2.tick_params(axis='y', labelsize=20, labelcolor='black')  # Set tick font size and label color
+    ax2.set_ylim(*ylims_cGB)  # Set y-axis limits for c_GB curves
+
+    # Add a legend for the c_GB lines only
+    #ax2.legend(loc="center left", bbox_to_anchor=(0.0, 0.52), fontsize=18, frameon=True)
+
+    fig.tight_layout()
+    plt.grid(True)
+    return fig, ax, ax2
+
+
+#%% Fig 9c
 def create_prop_vs_temp_plot(plot_data, file_name, legend_elements, xlims, element_text, alloy_conc, ylabel_text, custom_colors, gb_latex_dict, legend=False):
     fig, ax = plt.subplots(figsize=(12, 8))
     for data in plot_data:
@@ -861,14 +1072,127 @@ def plot_prop_vs_prop(df,
     if savefig_path is not None:
         plt.savefig(savefig_path, bbox_inches='tight', pad_inches=0.1)
     return fig, ax1
-#%% Fig 11
-def plot_prop_vs_prop_GB(df, gb_to_plot='S5_RA001_S210', y_prop="R_DDEC6_ANSBO", x_prop="E_seg", 
-                             custom_colors=None, gb_latex_dict=None, fig_dir='.', 
-                             ylabel=r"R$_{\rm{ANSBO}}$= ANSBO$_{\rm{seg}}$/ANSBO$_{\rm{pure}}$", 
-                             xlabel=r"E$_{\rm{seg}}$ (eV)", figsize=(12, 12), 
-                             xlabel_fontsize=36, ylabel_fontsize=36, xtick_fontsize=20, 
-                             ytick_fontsize=24, point_label_fontsize=24, padding_fraction=0.001):
+
+def plot_prop_vs_prop_with_2d_histograms(x_values,
+                                         y_values,
+                                         figsize=(20, 16),
+                                         x_label=r"E$_{\rm{seg}}$ (eV)",
+                                         x_label_fontsize=30,
+                                         xtick_fontsize=30,
+                                         y_label=r"W$_{\rm{sep}}^{\rm{RGS}}$ (J/m$^2$)",
+                                         y_label_fontsize=30,
+                                         ytick_fontsize=30,
+                                         hist_tick_fontsize=20,  # Added histograms' tick font size
+                                         colorbar_tick_fontsize=20,  # Added colorbar tick font size
+                                         colorbar_size=[0.92, 0.15, 0.02, 0.7],  # Colorbar size [left, bottom, width, height]
+                                         legend_posn=(0.001, 0.681),
+                                         xlims=None,
+                                         ylims=None,
+                                         x_bin_width=0.1,  # Bin width for the histograms
+                                         y_bin_width=0.05,
+                                         colormap='viridis',  # Colormap for the heatmap
+                                         savefig_path=None,
+                                         range_xy=None):  # Added range parameter
+
+    # Create a figure with a custom layout
+    fig = plt.figure(figsize=figsize)
+    gs = gridspec.GridSpec(4, 4, wspace=0.3, hspace=0.3)
     
+    # Main 2D histogram (heatmap)
+    ax_scatter = fig.add_subplot(gs[1:, :-1])
+    
+    # Histograms
+    ax_hist_x = fig.add_subplot(gs[0, :-1], sharex=ax_scatter)
+    ax_hist_y = fig.add_subplot(gs[1:, -1], sharey=ax_scatter)
+
+    # Drop NaN values in x and y data
+    valid_mask = ~np.isnan(x_values) & ~np.isnan(y_values)
+    x_values = np.array(x_values)[valid_mask]
+    y_values = np.array(y_values)[valid_mask]
+    if range_xy is None:
+        # Calculate the range for uniform binning and floor to align with zero
+        x_min, x_max = np.min(x_values), np.max(x_values)
+        y_min, y_max = np.min(y_values), np.max(y_values)
+
+        # Floor the minimum values to the nearest lower integer and ceil the maximum values to ensure alignment
+        x_min = np.floor(x_min)
+        x_max = np.ceil(x_max)
+        y_min = np.floor(y_min)
+        y_max = np.ceil(y_max)
+
+        # Ensure that zero is aligned as a bin edge
+        x_min = min(x_min, 0)
+        y_min = min(y_min, 0)
+        range_xy = [(x_min, x_max), (y_min, y_max)]
+        
+    # Calculate aligned bins to have a bin edge at 0 based on the bin width
+    x_min, x_max = range_xy[0]
+    y_min, y_max = range_xy[1]
+    
+    # Calculate bin edges based on the specified bin width
+    x_bins = np.arange(x_min, x_max + x_bin_width, x_bin_width)
+    y_bins = np.arange(y_min, y_max + y_bin_width, y_bin_width)
+
+    # 2D Histogram with log scale
+    heatmap = ax_scatter.hist2d(x_values, y_values, bins=[x_bins, y_bins], cmap=colormap, 
+                                norm=mcolors.LogNorm(), cmin=1, range=range_xy)
+
+    # Add a colorbar in a new axis to avoid layout issues
+    cbar_ax = fig.add_axes(colorbar_size)  # Positioning [left, bottom, width, height]
+    cbar = plt.colorbar(heatmap[3], cax=cbar_ax)
+    cbar.set_label('Count (log scale)', fontsize=20)
+    cbar.ax.tick_params(labelsize=colorbar_tick_fontsize)  # Set colorbar tick font size
+
+    # Set labels and ticks for scatter plot
+    ax_scatter.set_xlabel(x_label, fontsize=x_label_fontsize)
+    ax_scatter.set_ylabel(y_label, fontsize=y_label_fontsize)
+    ax_scatter.tick_params(axis='y', labelsize=ytick_fontsize, rotation=90)
+    ax_scatter.tick_params(axis='x', which='both', labelsize=xtick_fontsize)
+    ax_scatter.grid(which="both", alpha=0.3)
+
+    # Set limits if provided
+    if xlims is not None:
+        ax_scatter.set_xlim(xlims)
+    if ylims is not None:
+        ax_scatter.set_ylim(ylims)
+
+    # Plot histograms
+    ax_hist_x.hist(x_values, bins=x_bins, color="grey", alpha=0.7)
+    ax_hist_y.hist(y_values, bins=y_bins, color="grey", alpha=0.7, orientation='horizontal')
+    ax_hist_x.grid()
+    ax_hist_y.grid()
+    # Set tick params for the histograms with custom font size
+    ax_hist_x.tick_params(axis='y', labelsize=hist_tick_fontsize)
+    ax_hist_y.tick_params(axis='x', labelsize=hist_tick_fontsize)
+
+    # Hide x tick labels for top histogram and y tick labels for right histogram
+    plt.setp(ax_hist_x.get_xticklabels(), visible=False)
+    plt.setp(ax_hist_y.get_yticklabels(), visible=False)
+
+    # Save figure if path is provided
+    if savefig_path is not None:
+        plt.savefig(savefig_path, bbox_inches='tight', pad_inches=0.1)
+
+    return fig, ax_scatter
+
+
+#%% Fig 11
+
+def plot_prop_vs_prop_GB(df, gb_to_plot='S5_RA001_S210', y_prop="R_DDEC6_ANSBO", x_prop="E_seg", 
+                         custom_colors=None, gb_latex_dict=None, fig_dir='.', 
+                         ylabel=r"R$_{\rm{ANSBO}}$= ANSBO$_{\rm{seg}}$/ANSBO$_{\rm{pure}}$", 
+                         xlabel=r"E$_{\rm{seg}}$ (eV)", figsize=(12, 12), 
+                         xlabel_fontsize=36, ylabel_fontsize=36, xtick_fontsize=20, 
+                         ytick_fontsize=24, point_label_fontsize=24, padding_fraction=0.001,
+                         label_left=None, label_right=None, label_top=None, label_bottom=None,
+                         horizontal_padding=0.001, vertical_padding=0.001):
+    
+    # Initialize label position lists if None
+    label_left = label_left or []
+    label_right = label_right or []
+    label_top = label_top or []
+    label_bottom = label_bottom or []
+
     # Filter and prepare data
     filtered_df = df.copy()
 
@@ -877,8 +1201,8 @@ def plot_prop_vs_prop_GB(df, gb_to_plot='S5_RA001_S210', y_prop="R_DDEC6_ANSBO",
     y_range = filtered_df[y_prop].max() - filtered_df[y_prop].min()
 
     # Calculate the padding in axes coordinates
-    padding_axes_x = padding_fraction * x_range
-    padding_axes_y = padding_fraction * y_range
+    padding_axes_x = horizontal_padding * x_range
+    padding_axes_y = vertical_padding * y_range
 
     # Filter the DataFrame for the specified GB
     filtered_df = filtered_df[filtered_df["GB"] == gb_to_plot]
@@ -899,12 +1223,37 @@ def plot_prop_vs_prop_GB(df, gb_to_plot='S5_RA001_S210', y_prop="R_DDEC6_ANSBO",
     for _, row in min_eseg_per_element.iterrows():
         x_value = row[x_prop]
         y_value = row[y_prop]
-        # Apply padding by adding padding_axes_x to x_value
+        element = row["element"]
+
+        # Plot the scatter point
         ax1.scatter(x_value, y_value, color="r", marker="o", s=40)
-        ax1.text(x_value - padding_axes_x, y_value, row["element"], color="k", verticalalignment='center', horizontalalignment='right', fontsize=point_label_fontsize)
+
+        # Custom label positioning based on user-defined lists
+        if element in label_left:
+            ax1.text(x_value - padding_axes_x, y_value, element, color="k", 
+                     verticalalignment='center', horizontalalignment='right', 
+                     fontsize=point_label_fontsize)
+        elif element in label_right:
+            ax1.text(x_value + padding_axes_x, y_value, element, color="k", 
+                     verticalalignment='center', horizontalalignment='left', 
+                     fontsize=point_label_fontsize)
+        elif element in label_top:
+            ax1.text(x_value, y_value + padding_axes_y, element, color="k", 
+                     verticalalignment='bottom', horizontalalignment='center', 
+                     fontsize=point_label_fontsize)
+        elif element in label_bottom:
+            ax1.text(x_value, y_value - padding_axes_y, element, color="k", 
+                     verticalalignment='top', horizontalalignment='center', 
+                     fontsize=point_label_fontsize)
+        else:
+            # Default positioning if not specified
+            ax1.text(x_value-padding_axes_x, y_value + padding_axes_y, element, color="k", 
+                     verticalalignment='center', horizontalalignment='right', 
+                     fontsize=point_label_fontsize)
 
     # Text in the top left corner with large font size
-    ax1.text(0.02, 0.98, gb_latex_dict.get(gb_to_plot, gb_to_plot), color="k", fontsize=40, verticalalignment='top', horizontalalignment='left', transform=ax1.transAxes)
+    ax1.text(0.02, 0.98, gb_latex_dict.get(gb_to_plot, gb_to_plot), color="k", fontsize=40, 
+             verticalalignment='top', horizontalalignment='left', transform=ax1.transAxes)
 
     # Axes customization
     ax1.axhline(1.00, color='r', linewidth=2, linestyle="--")
