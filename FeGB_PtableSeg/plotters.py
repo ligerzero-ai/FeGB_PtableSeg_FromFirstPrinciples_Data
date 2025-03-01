@@ -9,9 +9,30 @@ import matplotlib.colors as mcolors  # Import for LogNorm
 import numpy as np
 import pandas as pd
 
+import warnings
 import os
 
 from pymatgen.core import Structure
+from pymatgen.core import Element
+
+module_path = os.path.dirname(os.path.abspath(__file__))
+ptable = pd.read_csv(os.path.join(module_path, "bulk_df.csv"))
+
+def get_element_number(symbol):
+    try:
+        return Element(symbol).Z
+    except ValueError:
+        warnings.warn(f"Warning: Symbol '{symbol}' was not found.")
+        return np.nan
+
+
+def get_element_symbol(element_number):
+    row = ptable[ptable["Z"] == element_number]
+    if not row.empty:
+        return row["element"].values[0]
+    else:
+        warnings.warn(f"Warning: Element with Z:{element_number} was not found.")
+        return np.nan
 
 custom_colors = {"S11_RA110_S3_32": 'red',
                  "S3_RA110_S1_11": 'blue',
@@ -667,9 +688,14 @@ def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
     all_x = []
     all_y = []
     
-    df[f"full_multiplicity_{x}"] = [[row[x]] * row.site_multiplicity for _, row in df.iterrows()]
-    df[f"full_multiplicity_{y}"] = [[row[y]] * row.site_multiplicity for _, row in df.iterrows()]
-
+    areas = {}
+    for GB, GB_df in df.groupby("GB"):
+        structure = Structure.from_str(GB_df.iloc[0].structure, fmt="json")
+        areas[GB] = structure.volume/structure.lattice.c/100 # nm^2 not Ang^2
+    
+    df[f"full_multiplicity_{x}"] = [[row[x]] * int(np.round(row.site_multiplicity / areas[row.GB])) for _, row in df.iterrows()]
+    df[f"full_multiplicity_{y}"] = [[row[y]] * int(np.round(row.site_multiplicity / areas[row.GB])) for _, row in df.iterrows()]
+    
     # Collect all data first to define global bin edges
     for gb_type, marker in gb_marker_dict.items():
         gb_df = df[df['GB'] == gb_type].dropna()
@@ -948,7 +974,7 @@ def create_prop_vs_temp_plot(plot_data, file_name, legend_elements, xlims, eleme
 
     # Additional text
     text_str = f'{element_text}\n{alloy_conc*100:.2f} at.%'
-    ax.text(0.05, 0.05, text_str, transform=ax.transAxes, fontsize=40, verticalalignment='bottom', horizontalalignment='left')
+    ax.text(0.02, 0.10, text_str, transform=ax.transAxes, fontsize=40, verticalalignment='bottom', horizontalalignment='left')
     
     # fig.savefig(f'{fig_dir}/TempEffectiveCohesion/{file_name}_{element_text}_{alloy_conc*100:.2f}.png', dpi=300, bbox_inches='tight', pad_inches=0.1)
     # plt.close(fig)
@@ -962,7 +988,10 @@ def plot_cohesion_vs_temp(df_spectra,
                           custom_colors,
                           gb_latex_dict,
                           xlims,
-                          cohesion_type="ANSBO"):
+                          ylabel_text="",
+                          cohesion_type="ANSBO",
+                          ylabel_pad=20,
+                          top_xlabel_pad=20):
     temperature_range = np.arange(temp_range[0], temp_range[1] + temp_step, temp_step)
     plot_data = []
     legend_elements = []
@@ -973,23 +1002,40 @@ def plot_cohesion_vs_temp(df_spectra,
 
         for _, row in ele_df.iterrows():
             temp_concs = []
-
             for temp in temperature_range:
                 concentration = calc_C_GB(temp, alloy_conc, np.array(row.full_seg_spectra))
                 eff_coh_eff = np.array(row[f'eta_coh_{cohesion_type}_spectra']) * concentration
                 temp_concs.append(eff_coh_eff.sum())
-
             plot_data.append((temperature_range, temp_concs, row.GB))
-
             color = custom_colors.get(row.GB, 'grey')
-            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', label=gb_latex_dict.get(row.GB, 'Unknown'),
+            legend_elements.append(plt.Line2D([0], [0], marker='o', color='w', 
+                                              label=gb_latex_dict.get(row.GB, 'Unknown'),
                                               markerfacecolor=color, markersize=15, linestyle='None'))
         legend_elements.append(legend_elements.pop(0))
 
-    ylabel_text = r"$\sum_i P_i \eta_i^{R_{" + cohesion_type + r"}}$"
     fig, ax = create_prop_vs_temp_plot(
-        plot_data, f"EffectiveCohesion_vs_Temp_{cohesion_type}", legend_elements, xlims, element_to_plot, alloy_conc,
-        ylabel_text, custom_colors, gb_latex_dict, legend=False)
+        plot_data, f"EffectiveCohesion_vs_Temp_{cohesion_type}", legend_elements, 
+        xlims, element_to_plot, alloy_conc, ylabel_text, custom_colors, gb_latex_dict, legend=False
+    )
+
+    # Set consistent tick label sizes on the main axes.
+    ax.tick_params(axis='x', labelsize=24)
+    ax.tick_params(axis='y', labelsize=24)
+
+    # Set the ylabel with the specified padding.
+    ax.set_ylabel(ax.get_ylabel(), labelpad=ylabel_pad, fontsize=40)
+
+    # Add a secondary x-axis on top showing temperature in Celsius instead of Kelvin.
+    kelvin_ticks = [73, 273, 473, 673, 873, 1073]
+    celsius_ticks = [k - 273 for k in kelvin_ticks]
+
+    ax2 = ax.twiny()  # create secondary x-axis
+    ax2.set_xlim(ax.get_xlim())
+    ax2.set_xticks(kelvin_ticks)
+    ax2.set_xticklabels([f"{c}" for c in celsius_ticks])
+    ax2.set_xlabel("Temperature (°C)", fontsize=24, labelpad=top_xlabel_pad)
+    # Set tick label sizes on the secondary x-axis.
+    ax2.tick_params(axis='x', labelsize=24)
 
     return fig, ax
 
