@@ -778,16 +778,27 @@ def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
     for GB, GB_df in df.groupby("GB"):
         structure = Structure.from_str(GB_df.iloc[0].structure, fmt="json")
         areas[GB] = structure.volume/structure.lattice.c/100 # nm^2 not Ang^2
-    
+    # Remove rows where either x or y is NaN
+    df = df.dropna(subset=[x, y])
+
     df[f"full_multiplicity_{x}"] = [[row[x]] * int(np.round(row.site_multiplicity / areas[row.GB])) for _, row in df.iterrows()]
     df[f"full_multiplicity_{y}"] = [[row[y]] * int(np.round(row.site_multiplicity / areas[row.GB])) for _, row in df.iterrows()]
     
     # Collect all data first to define global bin edges
     for gb_type, marker in gb_marker_dict.items():
-        gb_df = df[df['GB'] == gb_type].dropna()
+        gb_df = df[df['GB'] == gb_type].dropna(subset=[x, y])
+        if len(gb_df) == 0:
+            continue
+        # Create list for x values
+        x_list = gb_df[f"full_multiplicity_{x}"].explode().dropna().apply(np.ravel).tolist()
+        y_list = gb_df[f"full_multiplicity_{y}"].explode().dropna().apply(np.ravel).tolist()
 
-        plot_x = np.concatenate(gb_df[f"full_multiplicity_{x}"].explode().dropna().apply(np.ravel).tolist())
-        plot_y = np.concatenate(gb_df[f"full_multiplicity_{y}"].explode().dropna().apply(np.ravel).tolist())
+        # If either list is empty, skip this group
+        if not x_list or not y_list:
+            continue
+
+        plot_x = np.concatenate(x_list)
+        plot_y = np.concatenate(y_list)
 
         if mask_limits:
             mask = (plot_x >= mask_limits[0]) & (plot_x <= mask_limits[1]) & (plot_y >= mask_limits[0]) & (plot_y <= mask_limits[1])
@@ -812,9 +823,20 @@ def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
 
     # Re-loop to plot
     for gb_type, marker in gb_marker_dict.items():
-        plot_x = np.concatenate(df[df['GB'] == gb_type][f"full_multiplicity_{x}"].explode().dropna().apply(np.ravel).tolist())
-        plot_y = np.concatenate(df[df['GB'] == gb_type][f"full_multiplicity_{y}"].explode().dropna().apply(np.ravel).tolist())
-        
+        gb_df = df[df['GB'] == gb_type].dropna(subset=[x, y])
+        if len(gb_df) == 0:
+            continue
+        # Create list for x values
+        x_list = gb_df[f"full_multiplicity_{x}"].explode().dropna().apply(np.ravel).tolist()
+        y_list = gb_df[f"full_multiplicity_{y}"].explode().dropna().apply(np.ravel).tolist()
+
+        # If either list is empty, skip this group
+        if not x_list or not y_list:
+            continue
+
+        plot_x = np.concatenate(x_list)
+        plot_y = np.concatenate(y_list)
+
         if mask_limits:
             mask = (plot_x >= mask_limits[0]) & (plot_x <= mask_limits[1]) & (plot_y >= mask_limits[0]) & (plot_y <= mask_limits[1])
             plot_x = plot_x[mask]
