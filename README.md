@@ -1,7 +1,9 @@
 
 # FePtableSeg_FromFirstPrinciples
 
-Includes the data and code for reproducing analysis in the manuscript
+Includes the data and code for reproducing analysis in the manuscript here:
+
+https://arxiv.org/abs/2503.05640
 
 ## Installation
 You can install this package either using `pip` directly or by setting up a conda environment using `mamba`. Below are the instructions for both methods:
