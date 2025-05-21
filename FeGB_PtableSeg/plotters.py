@@ -256,75 +256,126 @@ def plot_pivot_table(
 
 
 #%% Fig 3
-def plot_minEseg_prop_vs_Z(df,
-                      y_prop="E_seg",
-                      x_prop="Z",
-                      ylabel=r"$\rm{min}(E_{\rm{seg}})$ (eV)",
-                      figsize=(20, 12),
-                      shift_xticks=False,
-                      xlabel_fontsize=24,
-                      xtick_yshift=0,
-                      ylabel_fontsize=24,
-                      xtick_fontsize=20,
-                      ytick_fontsize=24,
-                      legend_fontsize=20,
-                      xtick_labels = bulk_df.element.values,
-                      xtick_posns = bulk_df.Z.values):
-    # Create a plot
-    fig, ax1 = plt.subplots(figsize=figsize)
 
-    # To store legend handles for each GB
+def plot_minEseg_prop_vs_Z(
+    df,
+    y_prop="E_seg",
+    x_prop="Z",
+    ylabel=r"$\rm{min}(E_{\rm{seg}})$ (eV)",
+    figsize=(20, 12),
+    shift_xticks=False,
+    xlabel_fontsize=24,
+    xtick_yshift=0,
+    ylabel_fontsize=24,
+    xtick_fontsize=20,
+    ytick_fontsize=24,
+    legend_fontsize=20,
+    xtick_labels=bulk_df.element.values,
+    xtick_posns=bulk_df.Z.values,
+    highlight_Z_list=None,
+    highlight_region_kwargs=None,
+    highlight_region_line_kwargs=None,
+    legend_bbox_to_anchor = (0.63, 0.05)
+):
+    """
+    Plot min E_seg vs atomic number Z for each GB,
+    shade vertical bands for Z in highlight_Z_list and
+    draw solid boundary lines only at each band's outer edges.
+    """
+    # 1) Set up figure + axes
+    fig, ax1 = plt.subplots(figsize=figsize)
+    ax1.set_ylabel(ylabel, fontsize=ylabel_fontsize)
+    ax1.tick_params(axis="y", labelsize=ytick_fontsize)
+
     legend_handles = []
 
-    # Looping over each unique "GB" group
+    # 2) Plot each GB group
     for gb, group in df.dropna(subset=[y_prop]).groupby("GB"):
-        color = custom_colors.get(gb, 'black')  # Get color for each group, default to 'black' if not found
-
+        color = custom_colors.get(gb, "black")
         Eseg_col = "E_seg"
-        # For each "GB" group, find the minimum "E_seg"
-        min_eseg_per_element = group.groupby("element").apply(lambda x: x.nsmallest(1, Eseg_col).iloc[0])
-        min_eseg_per_element = min_eseg_per_element[min_eseg_per_element[Eseg_col] <= 0]
-        # Sorting values by 'Z' for consistent plotting
-        min_eseg_per_element = min_eseg_per_element.sort_values(by='Z')
+        min_eseg = (
+            group
+            .groupby("element")
+            .apply(lambda x: x.nsmallest(1, Eseg_col).iloc[0])
+            .reset_index(drop=True)
+        )
+        #min_eseg = min_eseg[min_eseg[y_prop] <= 0]
+        min_eseg = min_eseg.sort_values(by=x_prop)
 
-        # Plotting
-        x_values = min_eseg_per_element[x_prop]
-        y_values = min_eseg_per_element[y_prop]
+        x_vals = min_eseg[x_prop]
+        y_vals = min_eseg[y_prop]
 
-        line1, = ax1.plot(x_values, y_values, color=color, linestyle='--', marker="o", linewidth=3, markersize=6)
+        line, = ax1.plot(
+            x_vals, y_vals,
+            color=color,
+            linestyle="--",
+            marker="o",
+            linewidth=3,
+            markersize=6,
+            label=gb_latex_dict.get(gb, gb)
+        )
         ax1.axhline(0, color=color)
+        legend_handles.append(line)
 
-        # Collect legend entries if not already added
-        if gb not in [h.get_label() for h in legend_handles]:  # Avoid duplicates
-            legend_handles.append(line1)
+    # 3) Vertical gridlines every 3 Z
+    ax1.grid(False)
+    for pos in np.arange(1, 93, 3):
+        ax1.axvline(pos, linestyle="-", linewidth=0.5, color="grey", alpha=0.75)
 
-    # Set labels and axis
-    ax1.set_ylabel(ylabel, fontsize=ylabel_fontsize)
-    if xtick_labels is not None:
-        ax1.set_xticks(xtick_posns)
-        ax1.set_xticklabels(xtick_labels, fontsize=xtick_fontsize, rotation=90, va='center')
-    ax1.tick_params(axis='y', labelsize=ytick_fontsize)
+    # 4) Shade & bound contiguous highlight regions
+    if highlight_Z_list:
+        # defaults for shading
+        if highlight_region_kwargs is None:
+            highlight_region_kwargs = dict(color="lightgray", alpha=0.4)
+        # defaults for boundary lines
+        if highlight_region_line_kwargs is None:
+            highlight_region_line_kwargs = dict(color="black", linewidth=1.5, linestyle="-")
 
+        # group contiguous Z's into (start, end) pairs
+        sorted_Z = sorted(highlight_Z_list)
+        groups = []
+        start = prev = sorted_Z[0]
+        for z in sorted_Z[1:]:
+            if z == prev + 1:
+                prev = z
+            else:
+                groups.append((start, prev))
+                start = prev = z
+        groups.append((start, prev))
+
+        # for each contiguous block, shade and draw only outer boundaries
+        for start, end in groups:
+            left = start - 0.5
+            right = end + 0.5
+            ax1.axvspan(left, right, **highlight_region_kwargs)
+            ax1.axvline(left, **highlight_region_line_kwargs)
+            ax1.axvline(right, **highlight_region_line_kwargs)
+
+    # 5) Set x‐ticks and labels
+    ax1.set_xticks(xtick_posns)
+    ax1.set_xticklabels(
+        xtick_labels,
+        rotation=90,
+        fontsize=xtick_fontsize,
+        va="center"
+    )
+    ax1.set_xlim(min(xtick_posns) - 0.5, max(xtick_posns) + 0.5)
+
+    # 6) Optional vertical shift of tick labels
     if shift_xticks:
-        shifts = [-0.01, 0.04, 0.09]  # Define y-shift values for three lines
-        for i, label in enumerate(ax1.get_xticklabels()):
-            label.set_y(shifts[i % 3] + xtick_yshift)
+        shifts = [-0.01, 0.04, 0.09]
+        for i, lbl in enumerate(ax1.get_xticklabels()):
+            lbl.set_y(lbl.get_position()[1] + shifts[i % len(shifts)] + xtick_yshift)
 
-    # Manually adding gridlines at specified intervals (1, 4, 7, 10, ..., up to 92)
-    ax1.grid(False)  # Turn off grid
-    gridline_positions = np.arange(1, 93, 3)  # Generate positions
-    # Draw vertical lines for specified positions
-    for pos in gridline_positions:
-        ax1.axvline(x=pos, linestyle='-', linewidth='0.5', color='grey', alpha=0.75)  # Adjust alpha for visibility if needed
-
-    # Creating a custom legend with unique handles and labels, moving the first entry to the end
-    gb_legend_labels = [gb_latex_dict.get(gb, gb) for gb in custom_colors.keys()]
-
-    # Rearrange legend handles and labels
-    legend_handles = legend_handles[1:] + legend_handles[:1]
-    gb_legend_labels = gb_legend_labels[1:] + gb_legend_labels[:1]
-
-    plt.legend(legend_handles, gb_legend_labels, bbox_to_anchor=(0.63, 0.05), loc="lower left", fontsize=legend_fontsize)
+    # 7) Build and place legend (rotate first entry to end)
+    handles = legend_handles[1:] + legend_handles[:1]
+    labels  = [h.get_label() for h in handles]
+    ax1.legend(
+        handles, labels,
+        bbox_to_anchor=legend_bbox_to_anchor,
+        loc="lower left",
+        fontsize=legend_fontsize
+    )
 
     return fig, ax1
 
@@ -756,7 +807,86 @@ def plot_Eseg_vs_temperature(df_spectra, element_to_plot, gb_latex_dict, custom_
     ax1.legend(handles=legend_elements, fontsize=16, loc=legend_loc, bbox_to_anchor=legend_bbox_to_anchor)
 
     return fig, ax1
-
+#%% Fig 7c/7d Averaged upon reviewer request (collapse each T measured value into a single one over all high energy GBs)
+def compute_and_plot_avg_Eseg_vs_temperature(
+    df_spectra,
+    element,
+    alloy_conc=0.01 * 0.087,
+    temp_range=(100, 1000),
+    temp_step=20,
+    exclude_GB="S3_RA110_S1_12",
+    figsize=(12, 9),
+    legend_label = "Mo"
+):
+    """
+    Computes the average coverage and segregation energy over a temperature range for each GB,
+    then plots the mean segregation energy curve excluding a specified GB.
+    
+    Parameters:
+    - df_spectra: DataFrame with columns ["element", "GB", "full_seg_spectra"]
+    - element: String specifying which element to filter (e.g., "Ni")
+    - alloy_conc: Bulk alloy concentration (default 0.01 * 0.087)
+    - temp_range: Tuple (min_T, max_T) in Kelvin
+    - temp_step: Temperature increment
+    - exclude_GB: GB label to exclude from the average
+    - reference_value: Horizontal reference line value (eV)
+    - reference_label: Text for the reference line
+    - figsize: Tuple for figure size
+    - legend_loc: Legend location
+    - legend_bbox_to_anchor: Legend bbox_to_anchor tuple
+    
+    Returns:
+    - fig, ax: Matplotlib figure and axis
+    - avg_stats: DataFrame with columns ["GB", "avg_coverage", "avg_Eseg (eV)"]
+    """
+    # 1) Build temperature array
+    temps = np.arange(temp_range[0], temp_range[1] + temp_step, temp_step)
+    
+    # 2) Filter for the specified element
+    df_ele = df_spectra[df_spectra["element"] == element]
+    
+    # 3) Compute averages per GB
+    records = []
+    for GB, GB_df in df_ele.groupby("GB"):
+        coverages, Esegs = [], []
+        spectra = np.array(GB_df.full_seg_spectra.values[0])
+        for T in temps:
+            c_T = calc_C_GB(T, alloy_conc, spectra).mean()
+            coverages.append(c_T)
+            E_T = calculate_effective_temperature_eseg(c_T, T=T, cB=alloy_conc)
+            Esegs.append(E_T)
+        records.append({
+            "GB": GB,
+            "avg_coverage": coverages,
+            "avg_Eseg (eV)": Esegs
+        })
+    avg_stats = pd.DataFrame(records).sort_values("avg_Eseg (eV)")
+    
+    # 4) Filter out the excluded GB for plotting
+    filtered = avg_stats[avg_stats["GB"] != exclude_GB]
+    Eseg_array = np.stack(filtered["avg_Eseg (eV)"].values)
+    mean_Eseg = Eseg_array.mean(axis=0)
+    
+    # 5) Plot
+    fig, ax1 = plt.subplots(figsize=figsize)
+    ax1.plot(temps, mean_Eseg, linewidth=8, label=legend_label)
+    
+    # Styling consistent with original function
+    ax1.set_xlabel("Temperature (K)", fontsize=24)
+    ax1.set_ylabel("Effective segregation energy (eV)", fontsize=24)
+    ax1.tick_params(labelsize=24)
+    ax1.grid()
+    
+    kelvin_ticks = [73, 273, 473, 673, 873, 1073]
+    celsius_ticks = [k - 273 for k in kelvin_ticks]
+    ax2 = ax1.twiny()
+    ax2.set_xlim(ax1.get_xlim())
+    ax2.set_xticks(kelvin_ticks)
+    ax2.set_xticklabels([str(c) for c in celsius_ticks], fontsize=24)
+    ax2.set_xlabel("Temperature (°C)", fontsize=24)
+    ax2.tick_params(axis='x', labelsize=24)
+   
+    return fig, ax1, avg_stats
 #%% Fig 9a
 def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
                            xlabel=r"$\rm{R}_{\rm{W_{\rm{sep}}}}$", ylabel=r"$\rm{R}_{\rm{ANSBO}}$",
@@ -845,7 +975,7 @@ def plot_x_y_whist_spectra(df, x="R_wsep_lst", y="R_ANSBO_lst",
         counts_x, _ = np.histogram(plot_x, bins=binsx)
         counts_y, _ = np.histogram(plot_y, bins=binsy)
 
-        ax_scatter.scatter(plot_x, plot_y, alpha=0.9, marker=marker, s=200, label=gb_latex_dict[gb_type], c=custom_colors[gb_type])
+        ax_scatter.scatter(plot_x, plot_y, alpha=0.9, marker=marker, s=300, label=gb_latex_dict[gb_type], c=custom_colors[gb_type])
 
         ax_histx.bar(binsx[:-1], counts_x, width=np.diff(binsx), bottom=bottom_x, align='edge', label=gb_type, color=custom_colors[gb_type])
         bottom_x += counts_x
@@ -1148,83 +1278,146 @@ def plot_cohesion_vs_temp(df_spectra,
     return fig, ax
 
 #%% Figure 10
-def plot_prop_vs_prop(df,
-                  x_prop,
-                  y_prop,
-                  figsize=(20,16),
-                  x_label = r"E$_{\rm{seg}}$ (eV)",
-                  x_label_fontsize = 30,
-                  xtick_fontsize = 30,
-                  y_label = r"W$_{\rm{sep}}^{\rm{RGS}}$ (J/m$^2$)",
-                  y_label_fontsize = 30,
-                  ytick_fontsize = 30,
-                  element_groups = None,
-                  text_labels = None,
-                  legend_posn = (0.001,0.681),
-                  xlims=None,  # New parameter for x-axis limits
-                  ylims=None,  # New parameter for y-axis limits
-                  savefig_path = None):
-    
-    fig = plt.figure(figsize=figsize)
-    ax1 = plt.gca()
-    gb_legends = []
+def plot_prop_vs_prop_GB(
+    df,
+    gb_to_plot='S5_RA001_S210',
+    y_prop="R_DDEC6_ANSBO",
+    x_prop="E_seg",
+    custom_colors=None,
+    gb_latex_dict=None,
+    fig_dir='.',
+    ylabel=r"R$_{\rm{ANSBO}}$= ANSBO$_{\rm{seg}}$/ANSBO$_{\rm{pure}}$",
+    xlabel=r"E$_{\rm{seg}}$ (eV)",
+    figsize=(12, 12),
+    xlabel_fontsize=36,
+    ylabel_fontsize=36,
+    xtick_fontsize=20,
+    ytick_fontsize=24,
+    point_label_fontsize=24,
+    padding_fraction=0.001,
+    label_left=None,
+    label_right=None,
+    label_top=None,
+    label_bottom=None,
+    boxed_Z_list=None,           # ← NEW: which Z‐values to box
+    boxed_text_kwargs=None,      # ← NEW: style for the text bounding box
+    horizontal_padding=0.001,
+    vertical_padding=0.001
+):
+    # Initialize label position lists
+    label_left  = label_left or []
+    label_right = label_right or []
+    label_top   = label_top or []
+    label_bottom= label_bottom or []
 
-    df_plt = df.dropna(subset=[y_prop])
-    if element_groups is not None:
-        df_plt = df_plt[df_plt["ele_group"].isin(element_groups)]
+    # Initialize boxed_Z_list and default bbox style
+    boxed_Z_list = boxed_Z_list or []
+    if boxed_text_kwargs is None:
+        boxed_text_kwargs = dict(
+            facecolor='none',
+            edgecolor='black',
+            boxstyle='round,pad=0.2', 
+            #hatch='/'  
+        )
 
-    # df_plt = df_plt[df_plt["eta_Wsep_RGS"] > 0]
-    # Looping over each unique "GB" group
-    for idx, (gb, group) in enumerate(df_plt.dropna(subset=[y_prop]).groupby("GB")):
-        # Assigning custom color for each group
-        color = custom_colors[gb]
+    # Filter to this GB
+    filtered_df = df[df["GB"] == gb_to_plot].copy()
+    if filtered_df.empty:
+        print(f"No data available for GB: {gb_to_plot}")
+        return None, None
 
-        # Plotting
-        x_values = group[x_prop]  # "Z" values for x-axis
-        y_values = group[y_prop]  # Corresponding "min_wsep_rigid" values
-        elements = group.element  # Element values for text labels
+    # Compute ranges for padding
+    x_range = filtered_df[x_prop].max() - filtered_df[x_prop].min()
+    y_range = filtered_df[y_prop].max() - filtered_df[y_prop].min()
+    pad_x  = horizontal_padding * x_range
+    pad_y  = vertical_padding   * y_range
 
-        # Scatter plot for "min_wsep_rigid" on the primary y-axis
-        line1 = ax1.scatter(x_values, y_values, color=color, marker="x", s=100, linewidths=3, alpha=1.0)
-        
-        if text_labels is not None:
-            # Adding text labels for each marker
-            for x, y, element in zip(x_values, y_values, elements):
-                ax1.text(x, y, element, color=color, fontsize=20)
+    # Find min E_seg ≤ 0 per element
+    min_eseg_per_element = (
+        filtered_df
+        .groupby("element")
+        .apply(lambda x: x.nsmallest(1, x_prop).iloc[0])
+        .reset_index(drop=True)
+    )
+    min_eseg_per_element = min_eseg_per_element[min_eseg_per_element[x_prop] <= 0]
+    min_eseg_per_element = min_eseg_per_element.sort_values(by='Z')
 
-        # Creating legends
-        gb_legends.append((line1, f'{gb_latex_dict[gb]}'))
-        # ax1.axhline(df_coh_sub[df_coh_sub["GB"] == gb].iloc[0].pure_Wsep_min, color=color, linewidth=2, linestyle="--")
-    
-    gb_legends.append(gb_legends.pop(0))
-    # Modify marker size in legend by plotting empty lists
-    for line, label in gb_legends:
-        plt.scatter([], [], s=200, color=line.get_facecolor()[0], label=label)
+    # Set up plot
+    fig, ax1 = plt.subplots(figsize=figsize, dpi=80)
+    color = custom_colors.get(gb_to_plot, 'grey')
 
-    gb_legend = plt.legend(fontsize=30,
-                           loc="lower left",
-                           bbox_to_anchor=legend_posn,
-                           scatterpoints=1,
-                           frameon=True,
-                           handletextpad=0.1, # Reduces space between the marker and text
-                            borderpad=0.1,    # Reduces space between the text and legend border
-                            labelspacing=0.15)
+    # Scatter & annotate
+    for _, row in min_eseg_per_element.iterrows():
+        x_value = row[x_prop]
+        y_value = row[y_prop]
+        element = row["element"]
+        Z_val    = row["Z"]                  # atomic number
 
-    ax1.tick_params(axis='y', labelsize=xtick_fontsize, rotation=90)
-    ax1.tick_params(axis='x', which='both', labelsize=ytick_fontsize)
-    ax1.grid(which="both")
+        # plot marker
+        ax1.scatter(x_value, y_value, color="r", marker="o", s=40)
 
-    plt.xlabel(x_label, fontsize=x_label_fontsize)
-    plt.ylabel(y_label, fontsize=y_label_fontsize)
-    
-    # Setting x and y limits if provided
-    if xlims is not None:
-        ax1.set_xlim(xlims)
-    if ylims is not None:
-        ax1.set_ylim(ylims)
-        
-    if savefig_path is not None:
-        plt.savefig(savefig_path, bbox_inches='tight', pad_inches=0.1)
+        # decide bbox for this label
+        bbox_args = {'bbox': boxed_text_kwargs} if Z_val in boxed_Z_list else {}
+
+        # choose label position
+        if element in label_left:
+            ax1.text(
+                x_value - pad_x, y_value, element, color="k",
+                verticalalignment='center', horizontalalignment='right',
+                fontsize=point_label_fontsize,
+                **bbox_args
+            )
+        elif element in label_right:
+            ax1.text(
+                x_value + pad_x, y_value, element, color="k",
+                verticalalignment='center', horizontalalignment='left',
+                fontsize=point_label_fontsize,
+                **bbox_args
+            )
+        elif element in label_top:
+            ax1.text(
+                x_value, y_value + pad_y, element, color="k",
+                verticalalignment='bottom', horizontalalignment='center',
+                fontsize=point_label_fontsize,
+                **bbox_args
+            )
+        elif element in label_bottom:
+            ax1.text(
+                x_value, y_value - pad_y, element, color="k",
+                verticalalignment='top', horizontalalignment='center',
+                fontsize=point_label_fontsize,
+                **bbox_args
+            )
+        else:
+            ax1.text(
+                x_value - pad_x, y_value + pad_y, element, color="k",
+                verticalalignment='center', horizontalalignment='right',
+                fontsize=point_label_fontsize,
+                **bbox_args
+            )
+
+    # GB label in corner
+    ax1.text(
+        0.02, 0.98,
+        gb_latex_dict.get(gb_to_plot, gb_to_plot),
+        color="k", fontsize=40,
+        verticalalignment='top',
+        horizontalalignment='left',
+        transform=ax1.transAxes
+    )
+
+    # reference lines
+    ax1.axhline(1.00, color='r', linewidth=2, linestyle="--")
+    ax1.axvline(0,    color='r', linewidth=2, linestyle="--")
+
+    # axis labels and ticks
+    ax1.set_xlabel(xlabel, fontsize=xlabel_fontsize)
+    ax1.set_ylabel(ylabel, fontsize=ylabel_fontsize)
+    ax1.tick_params(axis='x', labelsize=xtick_fontsize)
+    ax1.tick_params(axis='y', labelsize=ytick_fontsize)
+
+    ax1.grid(True)
+
     return fig, ax1
 
 def plot_prop_vs_prop_with_2d_histograms(x_values,
@@ -1328,102 +1521,6 @@ def plot_prop_vs_prop_with_2d_histograms(x_values,
         plt.savefig(savefig_path, bbox_inches='tight', pad_inches=0.1)
 
     return fig, ax_scatter
-
-
-#%% Fig 11
-
-def plot_prop_vs_prop_GB(df, gb_to_plot='S5_RA001_S210', y_prop="R_DDEC6_ANSBO", x_prop="E_seg", 
-                         custom_colors=None, gb_latex_dict=None, fig_dir='.', 
-                         ylabel=r"R$_{\rm{ANSBO}}$= ANSBO$_{\rm{seg}}$/ANSBO$_{\rm{pure}}$", 
-                         xlabel=r"E$_{\rm{seg}}$ (eV)", figsize=(12, 12), 
-                         xlabel_fontsize=36, ylabel_fontsize=36, xtick_fontsize=20, 
-                         ytick_fontsize=24, point_label_fontsize=24, padding_fraction=0.001,
-                         label_left=None, label_right=None, label_top=None, label_bottom=None,
-                         horizontal_padding=0.001, vertical_padding=0.001):
-    
-    # Initialize label position lists if None
-    label_left = label_left or []
-    label_right = label_right or []
-    label_top = label_top or []
-    label_bottom = label_bottom or []
-
-    # Filter and prepare data
-    filtered_df = df.copy()
-
-    # Get the range of x-axis and y-axis
-    x_range = filtered_df[x_prop].max() - filtered_df[x_prop].min()
-    y_range = filtered_df[y_prop].max() - filtered_df[y_prop].min()
-
-    # Calculate the padding in axes coordinates
-    padding_axes_x = horizontal_padding * x_range
-    padding_axes_y = vertical_padding * y_range
-
-    # Filter the DataFrame for the specified GB
-    filtered_df = filtered_df[filtered_df["GB"] == gb_to_plot]
-
-    if filtered_df.empty:
-        print(f"No data available for GB: {gb_to_plot}")
-        return None, None
-
-    fig, ax1 = plt.subplots(figsize=figsize, dpi=80)
-    color = custom_colors.get(gb_to_plot, 'grey')  # Use custom colors from dictionary
-
-    # Minimum E_seg calculation per element
-    min_eseg_per_element = filtered_df.groupby("element").apply(lambda x: x.nsmallest(1, x_prop).iloc[0])
-    min_eseg_per_element = min_eseg_per_element[min_eseg_per_element[x_prop] <= 0]
-    min_eseg_per_element = min_eseg_per_element.sort_values(by='Z')
-
-    # Scatter plot with annotations
-    for _, row in min_eseg_per_element.iterrows():
-        x_value = row[x_prop]
-        y_value = row[y_prop]
-        element = row["element"]
-
-        # Plot the scatter point
-        ax1.scatter(x_value, y_value, color="r", marker="o", s=40)
-
-        # Custom label positioning based on user-defined lists
-        if element in label_left:
-            ax1.text(x_value - padding_axes_x, y_value, element, color="k", 
-                     verticalalignment='center', horizontalalignment='right', 
-                     fontsize=point_label_fontsize)
-        elif element in label_right:
-            ax1.text(x_value + padding_axes_x, y_value, element, color="k", 
-                     verticalalignment='center', horizontalalignment='left', 
-                     fontsize=point_label_fontsize)
-        elif element in label_top:
-            ax1.text(x_value, y_value + padding_axes_y, element, color="k", 
-                     verticalalignment='bottom', horizontalalignment='center', 
-                     fontsize=point_label_fontsize)
-        elif element in label_bottom:
-            ax1.text(x_value, y_value - padding_axes_y, element, color="k", 
-                     verticalalignment='top', horizontalalignment='center', 
-                     fontsize=point_label_fontsize)
-        else:
-            # Default positioning if not specified
-            ax1.text(x_value-padding_axes_x, y_value + padding_axes_y, element, color="k", 
-                     verticalalignment='center', horizontalalignment='right', 
-                     fontsize=point_label_fontsize)
-
-    # Text in the top left corner with large font size
-    ax1.text(0.02, 0.98, gb_latex_dict.get(gb_to_plot, gb_to_plot), color="k", fontsize=40, 
-             verticalalignment='top', horizontalalignment='left', transform=ax1.transAxes)
-
-    # Axes customization
-    ax1.axhline(1.00, color='r', linewidth=2, linestyle="--")
-    ax1.axvline(0, color='r', linewidth=2, linestyle="--")
-    
-    ax1.set_xlabel(xlabel, fontsize=xlabel_fontsize)
-    ax1.set_ylabel(ylabel, fontsize=ylabel_fontsize)
-    
-    ax1.tick_params(axis='x', labelsize=xtick_fontsize)
-    ax1.tick_params(axis='y', labelsize=ytick_fontsize)
-
-    ax1.grid(True)
-    # fig.savefig(f'{fig_dir}/SegregationEngineering_min_{x_prop}_vs_{y_prop}_{gb_to_plot}.png', dpi=300, bbox_inches='tight', pad_inches=0.1)
-    # plt.close(fig)
-
-    return fig, ax1
 
 #%% Fig 12
 
@@ -1718,170 +1815,146 @@ def get_colour_element(element):
 
     return colour
 
-
 def periodic_table_plot(
     plot_df,
     property="Eseg_min",
     count_min=None,
     count_max=None,
     center_cm_zero=False,
-    center_point=None,  # New parameter for arbitrary centering
+    center_point=None,     # arbitrary centering
     property_name=None,
     cmap=cm.Blues,
     element_font_color="darkgoldenrod",
+    highlight_Z_list=None,   # list of atomic numbers to crosshatch,
+    hatch_linewidth=2
 ):
+    import matplotlib as mpl
+    mpl.rcParams['hatch.linewidth'] = hatch_linewidth
     module_path = os.path.dirname(os.path.abspath(__file__))
     ptable = pd.read_csv(os.path.join(module_path, "periodic_table.csv"))
     ptable.index = ptable["symbol"].values
-    elem_tracker = ptable["count"]
-    ptable = ptable[ptable["Z"] <= 92]  # Cap at element 92
+    ptable = ptable[ptable["Z"] <= 92]  # cap at element 92
 
-    n_row = ptable["row"].max()
-    n_column = ptable["column"].max()
+    n_row = int(ptable["row"].max())
+    n_col = int(ptable["column"].max())
 
-    fig, ax = plt.subplots(figsize=(n_column, n_row))
-    rows = ptable["row"]
-    columns = ptable["column"]
-    symbols = ptable["symbol"]
-    rw = 0.9  # rectangle width
-    rh = rw  # rectangle height
+    fig, ax = plt.subplots(figsize=(n_col, n_row))
+    rw = 0.9
+    rh = rw
 
+    # Determine color scale bounds
     if count_min is None:
         count_min = plot_df[property].min()
     if count_max is None:
         count_max = plot_df[property].max()
 
-    # Adjust normalization based on centering preference
     if center_cm_zero:
-        cm_threshold = max(abs(count_min), abs(count_max))
-        norm = Normalize(-cm_threshold, cm_threshold)
+        cm_thr = max(abs(count_min), abs(count_max))
+        norm = Normalize(-cm_thr, cm_thr)
     elif center_point is not None:
-        # Adjust normalization to center around the arbitrary point
         max_diff = max(center_point - count_min, count_max - center_point)
         norm = Normalize(center_point - max_diff, center_point + max_diff)
     else:
         norm = Normalize(vmin=count_min, vmax=count_max)
 
-    for row, column, symbol in zip(rows, columns, symbols):
-        row = ptable["row"].max() - row
-        if symbol in plot_df.element.unique():
-            count = plot_df[plot_df["element"] == symbol][property].values[0]
-            # Check for NaN and adjust color and skip text accordingly
-            if pd.isna(count):
-                color = "grey"  # Set color to none for NaN values
-                count = ""  # Avoid displaying text for NaN values
+    # Plot each element cell
+    for _, elem in ptable.iterrows():
+        row = n_row - elem["row"]
+        col = elem["column"]
+        sym = elem["symbol"]
+        Zval = int(elem["Z"])
+
+        # determine facecolor
+        if sym in plot_df.element.values:
+            val = plot_df.loc[plot_df.element == sym, property].values[0]
+            if pd.isna(val):
+                face = "lightgray"
+                disp = ""
             else:
-                color = cmap(norm(count))
+                face = cmap(norm(val))
+                disp = f"{val:.2f}"
         else:
-            count = ""
-            color = "none"
+            face = "white"
+            disp = ""
 
         if row < 3:
             row += 0.5
+
+        # crosshatch if in highlight list
+        use_hatch = highlight_Z_list and Zval in highlight_Z_list
+        hatch_style = "//" if use_hatch else None
+        edge_col = "black" if use_hatch else "gray"
+        lw = 2.0 if use_hatch else 1.5
+
         rect = patches.Rectangle(
-            (column, row),
-            rw,
-            rh,
-            linewidth=1.5,
-            edgecolor="gray",
-            facecolor=color,
-            alpha=1,
+            (col, row),
+            rw, rh,
+            linewidth=lw,
+            edgecolor=edge_col,
+            facecolor=face,
+            hatch=hatch_style,
+            alpha=1.0
         )
-
-        # Element symbol
-        plt.text(
-            column + rw / 2,
-            row + rh / 2 + 0.2,
-            symbol,
-            horizontalalignment="center",
-            verticalalignment="center",
-            fontsize=22,  # Adjusted for visibility
-            fontweight="semibold",
-            color=element_font_color,
-        )
-
-        # Property value - Added below the symbol
-        if count:  # Only display if count is not empty (including not NaN)
-            plt.text(
-                column + rw / 2,
-                row + rh / 2 - 0.25,
-                f"{count:.2f}",  # Formatting count to 2 decimal places
-                horizontalalignment="center",
-                verticalalignment="center",
-                fontsize=14,  # Smaller font size for the count value
-                fontweight="semibold",
-                color=element_font_color,
-            )
-
-        ax.add_patch(rect)
-    # Generate the color bar
-    granularity = 20
-    colormap_array = (
-        np.linspace(norm.vmin, norm.vmax, granularity)
-        if center_point is None
-        else np.linspace(center_point - max_diff, center_point + max_diff, granularity)
-    )
-
-    for i, value in enumerate(colormap_array):
-        color = cmap(norm(value))
-        color = "silver" if value == 0 else color
-        length = 9
-        x_offset = 3.5
-        y_offset = 7.8
-        x_loc = i / granularity * length + x_offset
-        width = length / granularity
-        height = 0.35
-        rect = patches.Rectangle(
-            (x_loc, y_offset),
-            width,
-            height,
-            linewidth=1.5,
-            edgecolor="gray",
-            facecolor=color,
-            alpha=1,
-        )
-
-        if i in [
-            0,
-            granularity // 4,
-            granularity // 2,
-            3 * granularity // 4,
-            granularity - 1,
-        ]:
-            plt.text(
-                x_loc + width / 2,
-                y_offset - 0.4,
-                f"{value:.1f}",
-                horizontalalignment="center",
-                verticalalignment="center",
-                fontweight="semibold",
-                fontsize=20,
-                color="k",
-            )
-
         ax.add_patch(rect)
 
+        # element symbol
+        ax.text(
+            col + rw/2, row + rh/2 + 0.2, sym,
+            ha="center", va="center", fontsize=22,
+            fontweight="semibold", color=element_font_color
+        )
+        # value text
+        if disp:
+            ax.text(
+                col + rw/2, row + rh/2 - 0.25, disp,
+                ha="center", va="center", fontsize=20,
+                fontweight="semibold", color=element_font_color
+            )
+
+    # colorbar legend
+    gran = 20
+    if center_point is None:
+        vals = np.linspace(norm.vmin, norm.vmax, gran)
+    else:
+        vals = np.linspace(center_point - max_diff,
+                           center_point + max_diff, gran)
+    length = 9
+    x_off = 3.5
+    y_off = 7.8
+    for i, v in enumerate(vals):
+        colc = cmap(norm(v))
+        if v == 0:
+            colc = "silver"
+        x0 = i/gran * length + x_off
+        w = length/gran
+        rect = patches.Rectangle(
+            (x0, y_off), w, 0.35,
+            linewidth=1.5, edgecolor="gray",
+            facecolor=colc, alpha=1.0
+        )
+        ax.add_patch(rect)
+        if i in [0, gran//4, gran//2, 3*gran//4, gran-1]:
+            ax.text(
+                x0 + w/2, y_off - 0.4, f"{v:.1f}",
+                ha="center", va="center",
+                fontweight="semibold", fontsize=20, color="k"
+            )
+
+    # property label
     if property_name is None:
         property_name = property
-    plt.text(
-        x_offset + length / 2,
-        y_offset + 1.0,
-        property_name,
-        horizontalalignment="center",
-        verticalalignment="center",
-        fontweight="semibold",
-        fontsize=20,
-        color="k",
+    ax.text(
+        x_off + length/2, y_off + 1.0, property_name,
+        ha="center", va="center",
+        fontweight="semibold", fontsize=20, color="k"
     )
+
+    ax.set_xlim(0.85, n_col + 1.1)
     ax.set_ylim(-0.15, n_row + 0.1)
-    ax.set_xlim(0.85, n_column + 1.1)
-
     ax.axis("off")
-    plt.draw()
-    plt.pause(0.001)
-    plt.close()
-    return fig, ax
+    plt.tight_layout()
 
+    return fig, ax
 
 def periodic_table_dual_plot(
     plot_df,
