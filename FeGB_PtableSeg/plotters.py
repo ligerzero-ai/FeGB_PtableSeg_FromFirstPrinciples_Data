@@ -43,12 +43,12 @@ custom_colors = {"S11_RA110_S3_32": 'red',
 
 # Adjusting the first plot with specified font sizes
 gb_latex_dict = {
-    "S5_RA001_S310": r'$\Sigma5$[001]$(310)$',
-    "S5_RA001_S210": r'$\Sigma5$[001]$(210)$',
-    "S11_RA110_S3_32": r'$\Sigma11$[110]$(3\overline{3}2)$',
-    "S3_RA110_S1_12": r'$\Sigma3$[110]$(1\overline{1}2)$',
-    "S3_RA110_S1_11": r'$\Sigma3$[110]$(1\overline{1}1)$',
-    "S9_RA110_S2_21": r'$\Sigma9$[110]$(2\overline{2}1)$'
+    "S5_RA001_S310": r'$\Sigma5[001](310)$',
+    "S5_RA001_S210": r'$\Sigma5[001](210)$',
+    "S11_RA110_S3_32": r'$\Sigma11[110](3\overline{3}2)$',
+    "S3_RA110_S1_12": r'$\Sigma3[110](1\overline{1}2)$',
+    "S3_RA110_S1_11": r'$\Sigma3[110](1\overline{1}1)$',
+    "S9_RA110_S2_21": r'$\Sigma9[110](2\overline{2}1)$'
 }
 
 gb_marker_dict = {
@@ -808,6 +808,90 @@ def plot_Eseg_vs_temperature(df_spectra, element_to_plot, gb_latex_dict, custom_
 
     return fig, ax1
 #%% Fig 7c/7d Averaged upon reviewer request (collapse each T measured value into a single one over all high energy GBs)
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from FeGB_PtableSeg.plotters import calc_C_GB, calculate_effective_temperature_eseg
+
+def compute_avg_stats(df_spectra, element, alloy_conc, temp_range, temp_step):
+    """
+    Compute the avg_Eseg lists for a given element.
+    """
+    temps = np.arange(temp_range[0], temp_range[1] + temp_step, temp_step)
+    df_ele = df_spectra[df_spectra["element"] == element]
+    records = []
+    for GB, GB_df in df_ele.groupby("GB"):
+        Esegs = []
+        spectra = np.array(GB_df.full_seg_spectra.values[0])
+        for T in temps:
+            c_T = calc_C_GB(T, alloy_conc, spectra).mean()
+            E_T = calculate_effective_temperature_eseg(c_T, T=T, cB=alloy_conc)
+            Esegs.append(E_T)
+        records.append({"GB": GB, "avg_Eseg (eV)": Esegs})
+    return pd.DataFrame(records).sort_values("avg_Eseg (eV)")
+
+def plot_multi_avg_Eseg_vs_temperature(
+    df_spectra,
+    elements,
+    alloy_concs,
+    ref_values,
+    ref_labels,
+    temp_range=(100, 1200),
+    temp_step=20,
+    exclude_GB="S3_RA110_S1_12",
+    figsize=(12, 9),
+    legend_loc='lower left'
+):
+    """
+    Plot average Eseg vs T for multiple elements on same axes,
+    using each curve's color for its reference line/text.
+    """
+    temps = np.arange(temp_range[0], temp_range[1] + temp_step, temp_step)
+    fig, ax1 = plt.subplots(figsize=figsize)
+    
+    for element, conc, ref_val, ref_lbl in zip(elements, alloy_concs, ref_values, ref_labels):
+        # compute avg_stats
+        avg_stats = compute_avg_stats(df_spectra, element, conc, temp_range, temp_step)
+        filtered = avg_stats[avg_stats["GB"] != exclude_GB]
+        Eseg_array = np.stack(filtered["avg_Eseg (eV)"].values)
+        mean_Eseg = Eseg_array.mean(axis=0)
+        
+        # plot average curve and capture its color
+        line, = ax1.plot(temps, mean_Eseg, linewidth=4, label=f"{element} ({conc*100:.3f}% at.)")
+        color = line.get_color()
+        
+        # plot reference line and text in same color
+        ax1.axhline(ref_val, color=color, linestyle="--")
+        ax1.text(
+            temps[-1] + 25,
+            ref_val - 0.025,
+            ref_lbl,
+            color=color,
+            fontsize=24,
+            verticalalignment='bottom',
+            horizontalalignment='right'
+        )
+    
+    # styling
+    ax1.set_xlabel("Temperature (K)", fontsize=24)
+    ax1.tick_params(labelsize=24)
+    ax1.grid()
+    ax1.set_ylabel("Effective segregation energy (eV)", fontsize=24)
+
+    kelvin_ticks = [73, 273, 473, 673, 873, 1073]
+    celsius_ticks = [k - 273 for k in kelvin_ticks]
+    ax2 = ax1.twiny()
+    ax2.set_xlim(ax1.get_xlim())
+    ax2.set_xticks(kelvin_ticks)
+    ax2.set_xticklabels([str(c) for c in celsius_ticks], fontsize=24)
+    ax2.set_xlabel("Temperature (°C)", fontsize=24)
+    ax2.tick_params(axis='x', labelsize=24)
+    
+    ax1.legend(fontsize=24, loc=legend_loc)
+    plt.tight_layout()
+    return fig, ax1
+
 def compute_and_plot_avg_Eseg_vs_temperature(
     df_spectra,
     element,
@@ -1521,7 +1605,46 @@ def plot_prop_vs_prop_with_2d_histograms(x_values,
         plt.savefig(savefig_path, bbox_inches='tight', pad_inches=0.1)
 
     return fig, ax_scatter
-
+#%%
+def compute_cohesion_at_temps(
+    df_spectra,
+    alloy_conc,
+    temps,
+    cohesion_type="ANSBO"
+):
+    """
+    Returns a DataFrame with one row per element × GB × specified temperature,
+    containing the effective cohesion.
+    
+    Parameters:
+    - df_spectra: DataFrame with columns
+        ["element","GB","full_seg_spectra", f"eta_coh_{cohesion_type}_spectra"]
+    - alloy_conc: float, bulk alloy concentration
+    - temps: list or array of temperatures (in K) at which to compute
+    - cohesion_type: string suffix for the cohesion‐spectra column
+    
+    Returns:
+    - DataFrame with columns:
+        element, GB, temperature_K, effective_cohesion
+    """
+    records = []
+    for element, ele_df in df_spectra.groupby("element"):
+        for _, row in ele_df.iterrows():
+            spectra = np.array(row.full_seg_spectra)
+            eta_coh = np.array(row[f"eta_coh_{cohesion_type}_spectra"])
+            for T in temps:
+                # compute site coverages at this T
+                c_T = calc_C_GB(T, alloy_conc, spectra)
+                # sum up the cohesive contributions
+                eff_coh = (eta_coh * c_T).sum()
+                records.append({
+                    "element":          element,
+                    "GB":               row.GB,
+                    "temperature_K":    T,
+                    "effective_cohesion": eff_coh
+                })
+    df_out = pd.DataFrame(records)
+    return df_out.sort_values(["element","GB","temperature_K"]).reset_index(drop=True)
 #%% Fig 12
 
 #%%
@@ -1639,6 +1762,151 @@ def periodic_table_dual_plot(plot_df,
     plt.draw()
     plt.pause(0.001)
     plt.close()
+    return fig, ax
+
+def periodic_table_plot_filtered(
+    plot_df,
+    property="Eseg_min",
+    count_min=None,
+    count_max=None,
+    center_cm_zero=False,
+    center_point=None,
+    property_name=None,
+    cmap=cm.Blues,
+    element_font_color="darkgoldenrod",
+    elements_to_plot=None,      # new: list of symbols to draw
+    highlight_Z_list=None,
+    hatch_linewidth=2
+):
+    import matplotlib as mpl
+    mpl.rcParams['hatch.linewidth'] = hatch_linewidth
+    module_path = os.path.dirname(os.path.abspath(__file__))
+    ptable = pd.read_csv(os.path.join(module_path, "periodic_table.csv"))
+    ptable.index = ptable["symbol"].values
+    ptable = ptable[ptable["Z"] <= 92]
+
+    n_row = int(ptable["row"].max())
+    n_col = int(ptable["column"].max())
+
+    fig, ax = plt.subplots(figsize=(n_col, n_row))
+    rw = 0.9
+    rh = rw
+
+    # Determine color scale bounds
+    if count_min is None:
+        count_min = plot_df[property].min()
+    if count_max is None:
+        count_max = plot_df[property].max()
+
+    if center_cm_zero:
+        cm_thr = max(abs(count_min), abs(count_max))
+        norm = Normalize(-cm_thr, cm_thr)
+    elif center_point is not None:
+        max_diff = max(center_point - count_min, count_max - center_point)
+        norm = Normalize(center_point - max_diff, center_point + max_diff)
+    else:
+        norm = Normalize(vmin=count_min, vmax=count_max)
+
+    # Plot only specified elements
+    for _, elem in ptable.iterrows():
+        sym = elem["symbol"]
+        if elements_to_plot and sym not in elements_to_plot:
+            continue  # skip elements not requested
+
+        row = n_row - elem["row"]
+        col = elem["column"]
+        Zval = int(elem["Z"])
+
+        # determine facecolor and display
+        if sym in plot_df.element.values:
+            val = plot_df.loc[plot_df.element == sym, property].values[0]
+            if pd.isna(val):
+                face = "lightgray"
+                disp = ""
+            else:
+                face = cmap(norm(val))
+                disp = f"{val:.2f}"
+        else:
+            face = "white"
+            disp = ""
+
+        if row < 3:
+            row += 0.5
+
+        # crosshatch if in highlight list
+        use_hatch = highlight_Z_list and Zval in highlight_Z_list
+        hatch_style = "//" if use_hatch else None
+        edge_col = "black" if use_hatch else "gray"
+        lw = 2.0 if use_hatch else 1.5
+
+        # draw cell
+        rect = patches.Rectangle(
+            (col, row), rw, rh,
+            linewidth=lw,
+            edgecolor=edge_col,
+            facecolor=face,
+            hatch=hatch_style,
+            alpha=1.0
+        )
+        ax.add_patch(rect)
+
+        # element symbol
+        ax.text(
+            col + rw/2, row + rh/2 + 0.2, sym,
+            ha="center", va="center", fontsize=22,
+            fontweight="semibold", color=element_font_color
+        )
+        # value text
+        if disp:
+            ax.text(
+                col + rw/2, row + rh/2 - 0.25, disp,
+                ha="center", va="center", fontsize=20,
+                fontweight="semibold", color=element_font_color
+            )
+
+    # colorbar legend (unchanged)
+    gran = 20
+    if center_point is None:
+        vals = np.linspace(norm.vmin, norm.vmax, gran)
+    else:
+        vals = np.linspace(center_point - max_diff,
+                           center_point + max_diff, gran)
+    length = 9
+    x_off = 3.5
+    y_off = 7.8
+    for i, v in enumerate(vals):
+        colc = cmap(norm(v))
+        if v == 0:
+            colc = "silver"
+        x0 = i/gran * length + x_off
+        w = length/gran
+        rect = patches.Rectangle(
+            (x0, y_off), w, 0.35,
+            linewidth=1.5, edgecolor="gray",
+            facecolor=colc, alpha=1.0
+        )
+        ax.add_patch(rect)
+        if i in [0, gran//4, gran//2, 3*gran//4, gran-1]:
+            ax.text(
+                x0 + w/2, y_off - 0.4, f"{v:.1f}",
+                ha="center", va="center",
+                fontweight="semibold", fontsize=20, color="k"
+            )
+
+    # property label
+    if property_name is None:
+        property_name = property
+    ax.text(
+        x_off + length/2, y_off + 1.0, property_name,
+        ha="center", va="center",
+        fontsize=20, color="k",# fontweight="semibold"
+    )
+
+    ax.set_xlim(0.85, n_col + 1.1)
+    ax.set_ylim(-0.15, n_row + 0.1)
+    ax.axis("off")
+    plt.tight_layout()
+
     return fig, ax
 
 def draw_color_bar(fig, ax, norm, cmap, property_name, position, show_symbols=True, granularity=20):
