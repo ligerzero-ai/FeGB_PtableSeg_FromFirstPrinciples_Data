@@ -7,5 +7,6 @@ dependencies:
   - pip
   - ipython
   - jupyter
+  - numpy=1.26.4
   - pip:
     - -e .
