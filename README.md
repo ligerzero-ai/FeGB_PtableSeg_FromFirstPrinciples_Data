@@ -1,6 +1,8 @@
 
 # FePtableSeg_FromFirstPrinciples
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Includes the data and code for reproducing analysis in the manuscript here:
 
 https://arxiv.org/abs/2503.05640
