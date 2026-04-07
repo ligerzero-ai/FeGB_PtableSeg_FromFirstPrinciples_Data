@@ -6,8 +6,8 @@
 
 Data and analysis code for reproducing the figures and results in:
 
-> **Periodic-table-wide segregation at grain boundaries in ferritic iron from first principles**
-> Mai, Cui, Hickel, Ringer, Neugebauer
+> **A high-throughput ab initio study of elemental segregation and cohesion at ferritic-iron grain boundaries**
+> Han Lin Mai, Xiang-Yuan Cui, Tilmann Hickel, Jörg Neugebauer, Simon Ringer
 > [arXiv:2503.05640](https://arxiv.org/abs/2503.05640)
 
 ## Overview
@@ -210,8 +210,8 @@ If you use this data or code, please cite:
 
 ```bibtex
 @article{mai2025fegb_ptable,
-  title={Periodic-table-wide segregation at grain boundaries in ferritic iron from first principles},
-  author={Mai, Han Lin and Cui, Mianyu and Hickel, Tilmann and Ringer, Simon P. and Neugebauer, J{\"o}rg},
+  title={A high-throughput ab initio study of elemental segregation and cohesion at ferritic-iron grain boundaries},
+  author={Mai, Han Lin and Cui, Xiang-Yuan and Hickel, Tilmann and Neugebauer, J{\"o}rg and Ringer, Simon},
   journal={arXiv preprint arXiv:2503.05640},
   year={2025}
 }
