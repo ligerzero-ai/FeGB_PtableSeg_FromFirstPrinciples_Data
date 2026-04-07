@@ -9,7 +9,7 @@ setup(
         "ipython",
         "jupyter",
         "matplotlib==3.8.4",
-        "numpy==1.26.4"
+        "numpy==2.0.2"
     ],
     python_requires='>=3.9',
 )
