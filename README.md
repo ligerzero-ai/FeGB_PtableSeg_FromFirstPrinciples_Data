@@ -1,142 +1,222 @@
 
-# FePtableSeg_FromFirstPrinciples
+# FeGB_PtableSeg_FromFirstPrinciples_Data
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data/actions/workflows/ci.yml/badge.svg)](https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data/actions/workflows/ci.yml)
 
-Includes the data and code for reproducing analysis in the manuscript here:
+Data and analysis code for reproducing the figures and results in:
 
-https://arxiv.org/abs/2503.05640
+> **Periodic-table-wide segregation at grain boundaries in ferritic iron from first principles**
+> Mai, Cui, Hickel, Ringer, Neugebauer
+> [arXiv:2503.05640](https://arxiv.org/abs/2503.05640)
+
+## Overview
+
+This repository provides:
+
+- **`2025_03_02_ptable_Fe_GB_df.csv.gz` / `.pkl.gz`** -- The main dataset containing DFT-computed segregation energies, work of separation, DDEC6 bond orders, Voronoi descriptors, and magnetic moments for ~90 elements across 6 CSL grain boundaries in bcc Fe.
+- **`FeGB_PtableSeg/`** -- Python package with plotting functions and DDEC6/Chargemol analysis tools.
+- **`QuickStart.ipynb`** -- Notebook to regenerate all manuscript figures.
+- **`SupplementaryFigures.ipynb`** -- Supplementary figure generation.
+- **`Data/`** -- Example VASP+Chargemol output for the S11-RA110-S3-32-He-19 configuration.
+
+## Grain Boundaries Studied
+
+| GB | Sigma | N_atoms | Tilt Axis |
+|---|---|---|---|
+| S3-RA110-S1-11 | 3 | 72 | [110] |
+| S3-RA110-S1-12 | 3 | 48 | [110] |
+| S5-RA001-S210 | 5 | 76 (doubled) | [001] |
+| S5-RA001-S310 | 5 | 80 (doubled) | [001] |
+| S9-RA110-S2-21 | 9 | 68 | [110] |
+| S11-RA110-S3-32 | 11 | 42 | [110] |
 
 ## Installation
-You can install this package either using `pip` directly or by setting up a conda environment using `mamba`. Below are the instructions for both methods:
 
-### Using pip
+### Using pip (recommended)
 
-1. Create and activate a virtual environment:
-
-```bash
-python -m venv venv  # Create a virtual environment named 'venv'
-source venv/bin/activate  # Activate the virtual environment on macOS/Linux
-# .\venv\Scripts\activate  # Activate the virtual environment on Windows
-```
-
-2. To install the latest version of this package directly from GitHub, you can use the following command:
 ```bash
 pip install git+https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data
 ```
 
-### Using conda
+For development (with test dependencies):
 
-If you prefer to create a dedicated environment for this package using mamba, you can use the provided environment.yml file. This approach is recommended if you want to ensure that all specific binary dependencies are correctly installed. Follow these steps:
-
-1. Install mamba if you haven't already:
- ```bash
- conda install mamba
- ```
-2. Create a new conda environment:
-```bash
-mamba create -n FeGB_PtableSegData
-```
-3. Clone the repository:
 ```bash
 git clone https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data.git
 cd FeGB_PtableSeg_FromFirstPrinciples_Data
+pip install -e ".[dev]"
 ```
-4. Create the environment:
+
+### Using conda/mamba
+
 ```bash
+git clone https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data.git
+cd FeGB_PtableSeg_FromFirstPrinciples_Data
 mamba env create -f environment.yaml
-```
-5. Activate the new environment:
-```bash
 mamba activate FeGB_PtableSegData
 ```
 
-## Usage
-
-After installation, you can import the DataFrame by:
+## Quick Start
 
 ```python
 import pandas as pd
 
-df = pd.read_pickle("ptable_Fe_GB_df.pkl.gz", compression="gzip")
+# Load the dataset (CSV or pickle)
+df = pd.read_csv("2025_03_02_ptable_Fe_GB_df.csv.gz")
+# or: df = pd.read_pickle("2025_03_02_ptable_Fe_GB_df.pkl.gz", compression="gzip")
+
+# Filter to a specific element and GB
+ni_s3 = df[(df["element"] == "Ni") & (df["GB"] == "S3_RA110_S1_11")]
+print(ni_s3[["site", "E_seg", "Wsep_RGS_min"]].head())
 ```
 
-A quick overview on how to regenerate the plots from the publication can be found in the QuickStart.ipynb notebook.
-It is divided into sections which show you how to regenerate each plot in the manuscript.
-It contains some convenience plotting functions which accepts parameters (GB, element) for exploring the dataset.
+See `QuickStart.ipynb` for full plotting examples reproducing each manuscript figure.
 
-## Dataset Units
+## Package Modules
 
-In the provided dataframe, the columns are as follows:
+### `FeGB_PtableSeg.chargemol`
 
-| Column Name                   | Type                           | Units       | Description                                                                                             |
-|-------------------------------|--------------------------------|-------------|---------------------------------------------------------------------------------------------------------|
-| job_name                      | str                            |             | Job name in "GB"-"element"-"site" format                                                                |
-| GB                            | str                            |             | Grain boundary name, one of ['S11_RA110_S3_32', 'S3_RA110_S1_11', 'S3_RA110_S1_12', 'S5_RA001_S210', 'S5_RA001_S310', 'S9_RA110_S2_21'] |
-| element                       | str                            |             | The element of the segregant, in symbol form, i.e. Ni = Nickel                                           |
-| site                          | numpy.int64                    |             | The site occupied by the solute (0-indexed, i.e. first atom is site no. 0)                               |
-| equivalent_sites              | list containing ints           |             | The symmetrically equivalent sites in the GB                                                            |
-| site_multiplicity             | int                            |             | The multiplicity of the site at the GB, i.e. the length of the equivalent_sites list                     |
-| dist_GB                       | numpy.float64                  | Å           | The distance from the center of the _pure_ Fe GB                                                        |
-| structure                     | json-ised pymatgen structure representation v2023.11.10 |             | The relaxed structure                                                                                   |
-| E_seg                         | numpy.float64                  | eV          | The segregation energy of the solute in this site                                                       |
-| magmoms                       | numpy.ndarray                  |             | The magnetic moments of each atom in the final relaxed structure                                        |
-| magmom_solute                 | numpy.float64                  |             | The magnetic moment of the segregant                                                                    |
-| Wsep_RGS_min                  | numpy.float64                  | J/m²        | The minimum rigid work of separation                                                                    |
-| Wsep_RGS_list                 | list containing numpy.float64  | J/m²        | The list of rigid work of separations computed                                                          |
-| Wsep_RGS_cleavage_planes      | list containing numpy.float64  | J/m²        | The list of rigid work of separations computed                                                          |
-| Wsep_RGS_min_pure             | list containing numpy.float64  | J/m²        | The list of rigid work of separations computed for the pure GB                                          |
-| DDEC6_ANSBO_min               | numpy.float64                  |             | The minimum DDEC6 computed area-normalised summed bond orders in the structure                          |
-| DDEC6_ANSBO_profile           | list containing numpy.float64  |             | The list of DDEC6 computed area-normalised summed bond orders in the structure                          |
-| DDEC6_ANSBO_cleavage_coords   | list containing numpy.float64  |             | The coordinates at which the DDEC6 ANSBO values were computed                                           |
-| pure_DDEC6_min_ANSBO          | numpy.float64                  |             | The minimum value of ANSBO computed in the pure Fe GB                                                   |
-| R_Wsep_RGS                    | numpy.float64                  |             | The ratio of the segregated cohesion value to the R                                                     |
-| R_Wsep_RGS_lst                | list containing numpy.float64  |             | The list of ratios of segregated cohesion values                                                        |
-| R_DDEC6_ANSBO                 | numpy.float64                  |             | The ratio of the DDEC6 ANSBO value to the R                                                             |
-| R_DDEC6_ANSBO_lst             | list containing numpy.float64  |             | The list of ratios of DDEC6 ANSBO values                                                                |
-| ANSBO_Wsep_RGS_corr_vals      | list containing numpy.float64  |             | The list of correlation values between ANSBO and Wsep_RGS                                               |
-| VorNN_CoordNo                 | numpy.float64                  |             | Pymatgen computed Voronoi coordination number                                                          |
-| VorNN_tot_vol                 | numpy.float64                  | Å³          | Total volume of the Voronoi polyhedra around an atom                                                    |
-| VorNN_tot_area                | numpy.float64                  | Å²          | Total area of the faces of the Voronoi polyhedra around an atom                                         |
-| VorNN_volumes_std             | numpy.float64                  | Å³          | Standard deviation of the volumes of the Voronoi polyhedra around an atom                               |
-| VorNN_volumes_mean            | numpy.float64                  | Å³          | Mean volume of the Voronoi polyhedra around an atom                                                     |
-| VorNN_volumes_min             | numpy.float64                  | Å³          | Minimum volume of the Voronoi polyhedra around an atom                                                  |
-| VorNN_volumes_max             | numpy.float64                  | Å³          | Maximum volume of the Voronoi polyhedra around an atom                                                  |
-| VorNN_vertices_std            | numpy.float64                  |             | Standard deviation of the number of vertices of the Voronoi polyhedra around an atom                    |
-| VorNN_vertices_mean           | numpy.float64                  |             | Mean number of vertices of the Voronoi polyhedra around an atom                                         |
-| VorNN_vertices_min            | numpy.float64                  |             | Minimum number of vertices of the Voronoi polyhedra around an atom                                      |
-| VorNN_vertices_max            | numpy.float64                  |             | Maximum number of vertices of the Voronoi polyhedra around an atom                                      |
-| VorNN_areas_std               | numpy.float64                  | Å²          | Standard deviation of the areas of the faces of the Voronoi polyhedra around an atom                    |
-| VorNN_areas_mean              | numpy.float64                  | Å²          | Mean area of the faces of the Voronoi polyhedra around an atom                                          |
-| VorNN_areas_min               | numpy.float64                  | Å²          | Minimum area of the faces of the Voronoi polyhedra around an atom                                       |
-| VorNN_areas_max               | numpy.float64                  | Å²          | Maximum area of the faces of the Voronoi polyhedra around an atom                                       |
-| VorNN_distances_std           | numpy.float64                  | Å           | Standard deviation of the distances to the faces of the Voronoi polyhedra around an atom                |
-| VorNN_distances_mean          | numpy.float64                  | Å           | Mean distance to the faces of the Voronoi polyhedra around an atom                                      |
-| VorNN_distances_min           | numpy.float64                  | Å           | Minimum distance to the faces of the Voronoi polyhedra around an atom                                   |
-| VorNN_distances_max           | numpy.float64                  | Å           | Maximum distance to the faces of the Voronoi polyhedra around an atom                                   |
-| dist_GB_unrel                 | numpy.float64                  | Å           | Distance from the center of the _pure_ Fe GB before relaxation                                          |
-| E_seg_unrel                   | numpy.float64                  | eV          | Segregation energy of the solute in this site before relaxation                                         |
-| structure_unrel               | json-ised pymatgen structure representation v2023.11.10 |             | The unrelaxed structure                                                                                 |
-| magmoms_unrel                 | numpy.ndarray                  |             | Magnetic moments of each atom in the initial unrelaxed structure                                        |
-| magmom_solute_unrel           | numpy.float64                  |             | Magnetic moment of the segregant before relaxation                                                      |
-| VorNN_CoordNo_unrel           | numpy.float64                  |             | Voronoi coordination number before relaxation                                                           |
-| VorNN_tot_vol_unrel           | numpy.float64                  | Å³          | Total volume of the Voronoi polyhedra around an atom before relaxation                                  |
-| VorNN_tot_area_unrel          | numpy.float64                  | Å²          | Total area of the faces of the Voronoi polyhedra around an atom before relaxation                       |
-| VorNN_volumes_std_unrel       | numpy.float64                  | Å³          | Standard deviation of the volumes of the Voronoi polyhedra around an atom before relaxation             |
-| VorNN_volumes_mean_unrel      | numpy.float64                  | Å³          | Mean volume of the Voronoi polyhedra around an atom before relaxation                                   |
-| VorNN_volumes_min_unrel       | numpy.float64                  | Å³          | Minimum volume of the Voronoi polyhedra around an atom before relaxation                                |
-| VorNN_volumes_max_unrel       | numpy.float64                  | Å³          | Maximum volume of the Voronoi polyhedra around an atom before relaxation                                |
-| VorNN_vertices_std_unrel      | numpy.float64                  |             | Standard deviation of the number of vertices of the Voronoi polyhedra around an atom before relaxation  |
-| VorNN_vertices_mean_unrel     | numpy.float64                  |             | Mean number of vertices of the Voronoi polyhedra around an atom before relaxation                       |
-| VorNN_vertices_min_unrel      | numpy.float64                  |             | Minimum number of vertices of the Voronoi polyhedra around an atom before relaxation                    |
-| VorNN_vertices_max_unrel      | numpy.float64                  |             | Maximum number of vertices of the Voronoi polyhedra around an atom before relaxation                    |
-| VorNN_areas_std_unrel         | numpy.float64                  | Å²          | Standard deviation of the areas of the faces of the Voronoi polyhedra around an atom before relaxation  |
-| VorNN_areas_mean_unrel        | numpy.float64                  | Å²          | Mean area of the faces of the Voronoi polyhedra around an atom before relaxation                        |
-| VorNN_areas_min_unrel         | numpy.float64                  | Å²          | Minimum area of the faces of the Voronoi polyhedra around an atom before relaxation                     |
-| VorNN_areas_max_unrel         | numpy.float64                  | Å²          | Maximum area of the faces of the Voronoi polyhedra around an atom before relaxation                     |
-| VorNN_distances_std_unrel     | numpy.float64                  | Å           | Standard deviation of the distances to the faces of the Voronoi polyhedra around an atom before relaxation|
-| VorNN_distances_mean_unrel    | numpy.float64                  | Å           | Mean distance to the faces of the Voronoi polyhedra around an atom before relaxation                    |
-| VorNN_distances_min_unrel     | numpy.float64                  | Å           | Minimum distance to the faces of the Voronoi polyhedra around an atom before relaxation                 |
-| VorNN_distances_max_unrel     | numpy.float64                  | Å           | Maximum distance to the faces of the Voronoi polyhedra around an atom before relaxation                 |
+Parse DDEC6 Chargemol output files and compute area-normalised summed bond orders (ANSBO) across cleavage planes:
 
+```python
+from FeGB_PtableSeg.chargemol import ChargemolAnalysis
 
+ca = ChargemolAnalysis("Data/S11-RA110-S3-32-He-19")
+coords, ansbo_profile = ca.get_ANSBO_profile()
+result = ca.analyse_ANSBO()  # layer_boundaries, cleavage_coord, ANSBO_profile
+```
+
+### `FeGB_PtableSeg.plotters`
+
+Publication-quality plotting functions for periodic-table heatmaps, segregation energy profiles, and GB-resolved scatter plots. Includes GB symmetry mappings, LaTeX labels, and color/marker dictionaries.
+
+## Dataset Columns
+
+The dataset has 90 columns and 4,289 rows. Key columns are listed below; for the full set inspect `df.columns`.
+
+### Identifiers
+
+| Column | Type | Description |
+|---|---|---|
+| `job_name` | str | Job identifier in `GB_element_site` format |
+| `GB` | str | Grain boundary name (e.g. `S11_RA110_S3_32`) |
+| `element` | str | Segregant element symbol |
+| `Z` | int | Atomic number of segregant |
+| `site` | int | Atomic site index (0-indexed) |
+| `GB_site` | str | Combined `GB-site` identifier |
+| `GB_element_site` | str | Combined `GB_element_site` identifier |
+| `solute_idx` | float | Index of the solute atom in the structure |
+| `equivalent_sites` | list[int] | Symmetrically equivalent sites |
+| `site_multiplicity` | int | Number of equivalent sites |
+
+### Energetics (units: eV for energies, J/m2 for Wsep)
+
+| Column | Type | Description |
+|---|---|---|
+| `E_seg` | float | Segregation energy (relaxed) |
+| `E_seg_unrel` | float | Segregation energy (unrelaxed / static) |
+| `Wsep_RGS_min` | float | Minimum rigid grain separation work of separation |
+| `Wsep_RGS_list` | list[float] | Wsep at each cleavage plane |
+| `Wsep_RGS_cleavage_planes` | list[float] | Fractional z-coords of cleavage planes |
+| `Wsep_RGS_min_pure` | float | Pure Fe reference Wsep |
+| `R_Wsep_RGS` | float | Wsep ratio: segregated / pure |
+| `R_Wsep_RGS_lst` | list[float] | Wsep ratio at each cleavage plane |
+
+### Geometry (units: angstrom)
+
+| Column | Type | Description |
+|---|---|---|
+| `dist_GB` | float | Distance from GB plane (relaxed structure) |
+| `dist_GB_unrel` | float | Distance from GB plane (unrelaxed structure) |
+| `site_z` | float | Fractional z-coordinate of solute site (relaxed) |
+| `site_z_unrel` | float | Fractional z-coordinate of solute site (unrelaxed) |
+| `structure` | json | Relaxed pymatgen Structure (JSON-serialised) |
+| `structure_unrel` | json | Unrelaxed pymatgen Structure (JSON-serialised) |
+
+### Magnetic Properties
+
+| Column | Type | Description |
+|---|---|---|
+| `magmoms` | array | Magnetic moments of all atoms (relaxed) |
+| `magmom_solute` | float | Solute atom magnetic moment (relaxed) |
+| `magmoms_unrel` | array | Magnetic moments of all atoms (unrelaxed) |
+| `magmom_solute_unrel` | float | Solute atom magnetic moment (unrelaxed) |
+| `convergence` | bool | Whether ionic relaxation converged |
+
+### Cleavage / Pure GB Reference
+
+| Column | Type | Description |
+|---|---|---|
+| `cleavage_planes` | list[float] | Cleavage plane fractional z-coordinates |
+| `cp_names` | list[str] | Cleavage plane identifiers |
+| `pure_cleavage_planes` | list[float] | Pure Fe cleavage plane coordinates |
+| `pure_cleavage_energies` | list[float] | Pure Fe cleavage energies at each plane |
+| `pure_min_wsep_rigid` | float | Pure Fe minimum rigid Wsep (J/m2) |
+| `convergence_pureGB` | bool | Whether the pure GB reference converged |
+| `magmoms_pureGB` | array | Magnetic moments of the pure Fe GB |
+
+### DDEC6 Bond Order Analysis
+
+| Column | Type | Description |
+|---|---|---|
+| `DDEC6_min_ANSBO` | float | Minimum ANSBO (duplicate of `DDEC6_ANSBO_min`) |
+| `DDEC6_ANSBO_min` | float | Minimum area-normalised summed bond order |
+| `DDEC6_ANSBO_profile` | list[float] | ANSBO at each cleavage plane |
+| `DDEC6_ANSBO_cleavage_coords` | list[float] | Cleavage plane coordinates for ANSBO |
+| `DDEC6_ANSBO_atomic_layers` | list[float] | Atomic layer boundaries |
+| `DDEC6_ANSBO_within_range` | bool/list | Whether ANSBO is within expected range |
+| `pure_ca_results` | dict | Raw Chargemol analysis results for pure GB |
+| `pure_DDEC6_min_ANSBO` | float | Pure Fe reference minimum ANSBO |
+| `pure_DDEC6_ANSBO_profile` | list[float] | Pure Fe ANSBO profile |
+| `pure_DDEC6_ANSBO_cleavage_coords` | list[float] | Pure Fe ANSBO cleavage coordinates |
+| `pure_DDEC6_ANSBO_atomic_layers` | list[float] | Pure Fe atomic layer boundaries |
+| `pure_DDEC6_ANSBO_within_range` | bool/list | Pure Fe ANSBO range check |
+| `R_DDEC6_ANSBO` | float | ANSBO ratio: segregated / pure |
+| `R_DDEC6_ANSBO_lst` | list[float] | ANSBO ratio at each cleavage plane |
+| `ANSBO_Wsep_RGS_corr_vals` | list[float] | ANSBO-Wsep correlation values |
+
+### Voronoi Nearest-Neighbour Descriptors (units: angstrom/angstrom2/angstrom3)
+
+16 Voronoi polyhedra descriptors are provided for both relaxed and unrelaxed (`_unrel` suffix) structures:
+
+| Column Pattern | Description |
+|---|---|
+| `VorNN_CoordNo` | Coordination number |
+| `VorNN_tot_vol` | Total Voronoi polyhedra volume |
+| `VorNN_tot_area` | Total face area |
+| `VorNN_{volumes,vertices,areas,distances}_{std,mean,min,max}` | Statistics of polyhedra faces |
+
+## DFT Parameters
+
+All calculations performed with VASP using the PBE functional:
+
+- **ENCUT:** 400 eV
+- **ISMEAR:** 1 (Methfessel-Paxton), SIGMA = 0.2
+- **KSPACING:** 0.5
+- **POTCAR:** Fe (8e) PAW_PBE
+- **Relaxation:** ISIF=2, NSW=200, EDIFF=1E-5, EDIFFG=-0.01
+- **Magnetic:** ISPIN=2, MAGMOM ~ 3 uB per Fe
+
+## Running Tests
+
+```bash
+pip install -e ".[dev]"
+pytest tests/ -v
+```
+
+## Citation
+
+If you use this data or code, please cite:
+
+```bibtex
+@article{mai2025fegb_ptable,
+  title={Periodic-table-wide segregation at grain boundaries in ferritic iron from first principles},
+  author={Mai, Han Lin and Cui, Mianyu and Hickel, Tilmann and Ringer, Simon P. and Neugebauer, J{\"o}rg},
+  journal={arXiv preprint arXiv:2503.05640},
+  year={2025}
+}
+```
+
+## License
+
+[MIT](LICENSE) -- Copyright (c) 2025 Han Lin Mai, The University of Sydney and the Max Planck Institute of Sustainable Materials.

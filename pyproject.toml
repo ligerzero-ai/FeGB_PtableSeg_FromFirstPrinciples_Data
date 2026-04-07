@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "FeGB_PtableSeg"
+version = "0.2.0"
+description = "Data and analysis code for periodic-table-wide Fe grain boundary segregation from first principles"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    { name = "Han Lin Mai" },
+]
+dependencies = [
+    "pymatgen>=2023.10",
+    "matplotlib>=3.8",
+    "numpy>=1.24",
+    "pandas>=1.5",
+    "ipython",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-cov",
+]
+jupyter = [
+    "jupyter",
+    "notebook",
+]
+
+[project.urls]
+Homepage = "https://github.com/ligerzero-ai/FeGB_PtableSeg_FromFirstPrinciples_Data"
+Paper = "https://arxiv.org/abs/2503.05640"
+
+[tool.setuptools.packages.find]
+include = ["FeGB_PtableSeg*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
