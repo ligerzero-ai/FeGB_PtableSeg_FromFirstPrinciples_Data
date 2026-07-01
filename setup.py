@@ -8,7 +8,7 @@ setup(
         "pymatgen==2023.10.11",
         "ipython",
         "jupyter",
-        "matplotlib==3.8.4",
+        "matplotlib==3.10.9",
         "numpy==1.26.4"
     ],
     python_requires='>=3.9',
