@@ -5,7 +5,7 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
-        "pymatgen==2023.10.11",
+        "pymatgen==2025.10.7",
         "ipython",
         "jupyter",
         "matplotlib==3.8.4",
